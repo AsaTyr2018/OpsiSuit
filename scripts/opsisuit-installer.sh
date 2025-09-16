@@ -1590,6 +1590,163 @@ bring_up_stack() {
   popd >/dev/null
 }
 
+is_container_running() {
+  local container_name="$1"
+
+  docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null | grep -q '^true$'
+}
+
+wait_for_container_running() {
+  local container_name="$1"
+  local timeout_seconds=${2:-60}
+  local interval_seconds=2
+  local waited=0
+
+  while (( waited < timeout_seconds )); do
+    if is_container_running "$container_name"; then
+      return 0
+    fi
+    sleep "$interval_seconds"
+    (( waited += interval_seconds ))
+  done
+
+  return 1
+}
+
+ensure_opsi_admin_account() {
+  if (( SKIP_START )); then
+    if language_is_de; then
+      log_info "Überspringe Erstellung des OPSI-Administrator-Kontos, da --skip-start gesetzt ist."
+    else
+      log_info "Skipping OPSI administrator account provisioning because --skip-start is set."
+    fi
+    return 0
+  fi
+
+  local admin_user
+  local admin_password
+  local container_name="opsisuit-server"
+
+  admin_user="$(get_effective_env_value OPSI_ADMIN_USER)"
+  admin_password="$(get_effective_env_value OPSI_ADMIN_PASSWORD)"
+
+  if [[ -z "$admin_user" ]]; then
+    if language_is_de; then
+      log_warn "OPSI_ADMIN_USER ist nicht gesetzt; überspringe die Provisionierung des Administrator-Kontos."
+    else
+      log_warn "OPSI_ADMIN_USER is not set; skipping administrator account provisioning."
+    fi
+    return 0
+  fi
+
+  if [[ -z "$admin_password" ]]; then
+    if language_is_de; then
+      log_warn "OPSI_ADMIN_PASSWORD ist nicht gesetzt; überspringe die Provisionierung des Administrator-Kontos."
+    else
+      log_warn "OPSI_ADMIN_PASSWORD is not set; skipping administrator account provisioning."
+    fi
+    return 0
+  fi
+
+  if (( DRY_RUN )); then
+    if language_is_de; then
+      log_info "[dry-run] Würde sicherstellen, dass der OPSI-Administrator '${admin_user}' im Container '${container_name}' existiert."
+    else
+      log_info "[dry-run] Would ensure OPSI administrator '${admin_user}' exists inside container '${container_name}'."
+    fi
+    return 0
+  fi
+
+  if ! wait_for_container_running "$container_name" 60; then
+    if language_is_de; then
+      log_warn "Container ${container_name} läuft nicht; überspringe die Provisionierung des OPSI-Administrator-Kontos."
+    else
+      log_warn "Container ${container_name} is not running; skipping OPSI administrator provisioning."
+    fi
+    return 0
+  fi
+
+  local password_hash
+  if ! password_hash="$(openssl passwd -6 "$admin_password")"; then
+    if language_is_de; then
+      log_error "Konnte keinen Passwort-Hash für den OPSI-Administrator erzeugen."
+    else
+      log_error "Failed to generate password hash for the OPSI administrator."
+    fi
+    exit 1
+  fi
+
+  if [[ -z "$password_hash" ]]; then
+    if language_is_de; then
+      log_error "Der erzeugte Passwort-Hash für den OPSI-Administrator ist leer."
+    else
+      log_error "Generated password hash for the OPSI administrator is empty."
+    fi
+    exit 1
+  fi
+
+  local user_exists=0
+  if docker exec "$container_name" getent passwd "$admin_user" >/dev/null 2>&1; then
+    user_exists=1
+  fi
+
+  if (( user_exists )); then
+    if language_is_de; then
+      log_info "Stelle sicher, dass bestehender OPSI-Administrator '${admin_user}' korrekt konfiguriert ist."
+    else
+      log_info "Ensuring existing OPSI administrator '${admin_user}' is configured correctly."
+    fi
+  else
+    if language_is_de; then
+      log_info "Erstelle OPSI-Administrator '${admin_user}' im Container ${container_name}."
+    else
+      log_info "Creating OPSI administrator '${admin_user}' inside container ${container_name}."
+    fi
+  fi
+
+  if ! docker exec -i \
+      -e OPSI_ADMIN_TARGET_USER="$admin_user" \
+      -e OPSI_ADMIN_PASSWORD_HASH="$password_hash" \
+      "$container_name" sh <<'EOF'
+set -e
+
+user="${OPSI_ADMIN_TARGET_USER}"
+hash="${OPSI_ADMIN_PASSWORD_HASH}"
+
+if [ -z "$user" ] || [ -z "$hash" ]; then
+  echo "Missing OPSI_ADMIN_TARGET_USER or OPSI_ADMIN_PASSWORD_HASH" >&2
+  exit 1
+fi
+
+if ! getent group "$user" >/dev/null 2>&1; then
+  groupadd "$user"
+fi
+
+if ! id -u "$user" >/dev/null 2>&1; then
+  useradd -m -s /bin/sh -g "$user" "$user"
+else
+  usermod -g "$user" "$user" >/dev/null 2>&1 || true
+  usermod -s /bin/sh "$user" >/dev/null 2>&1 || true
+  if [ ! -d "/home/$user" ]; then
+    mkdir -p "/home/$user"
+    chown "$user:$user" "/home/$user"
+  fi
+fi
+
+usermod -p "$hash" "$user"
+usermod -U "$user" >/dev/null 2>&1 || true
+chage -I -1 -m 0 -M 99999 -E -1 "$user" >/dev/null 2>&1 || true
+EOF
+  then
+    if language_is_de; then
+      log_error "Provisionierung des OPSI-Administrator-Kontos im Container ${container_name} ist fehlgeschlagen."
+    else
+      log_error "Failed to provision the OPSI administrator account inside container ${container_name}."
+    fi
+    exit 1
+  fi
+}
+
 main() {
   parse_args "$@"
 
@@ -1600,6 +1757,7 @@ main() {
   ensure_dependencies
   ensure_opsiconfd_ssl_assets
   bring_up_stack
+  ensure_opsi_admin_account
 
   log_info "OpsiSuit installer finished"
 
