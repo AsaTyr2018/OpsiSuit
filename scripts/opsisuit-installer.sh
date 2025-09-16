@@ -8,7 +8,6 @@ DATA_DIR="${PROJECT_ROOT}/data"
 LOG_DIR="${PROJECT_ROOT}/logs"
 BACKUP_DIR="${PROJECT_ROOT}/backups"
 
-ENV_TEMPLATE="${DOCKER_DIR}/.env.example"
 ENV_FILE="${DOCKER_DIR}/.env"
 COMPOSE_FILE="${DOCKER_DIR}/docker-compose.yml"
 
@@ -20,6 +19,33 @@ FORCE_CONFIG=0
 
 PACKAGE_MANAGER=""
 APT_UPDATED=0
+
+LANGUAGE=""
+declare -A EXISTING_ENV_VALUES=()
+declare -A ENV_VALUES=()
+
+ENV_VARIABLES=(
+  DB_ROOT_PASSWORD
+  DB_NAME
+  DB_USER
+  DB_PASSWORD
+  DB_PORT
+  OPSI_ADMIN_USER
+  OPSI_ADMIN_PASSWORD
+  OPSI_SERVER_FQDN
+  OPSI_API_PORT
+  OPSI_DEPOT_PORT
+  OPSI_WEBUI_PORT
+  OPSI_SERVER_IMAGE
+  AGENT_SECRET
+  AGENT_POLL_INTERVAL
+  PXE_HTTP_PORT
+  PXE_TFTP_PORT
+  SERVICE_UID
+  SERVICE_GID
+  TIMEZONE
+  PXE_IMAGE
+)
 
 declare -a MISSING_DEPENDENCIES=()
 declare -a DOCKER_COMPOSE_CMD=()
@@ -36,6 +62,418 @@ log_error() {
   printf '[ERROR] %s\n' "$*" >&2
 }
 
+language_is_de() {
+  [[ "$LANGUAGE" == "DE" ]]
+}
+
+select_language() {
+  local prompt="Sprache auswählen / Select language [DE/en]: "
+  local answer=""
+
+  while true; do
+    read -r -p "$prompt" answer
+    answer=${answer:-DE}
+    case "${answer^^}" in
+      DE)
+        LANGUAGE="DE"
+        log_info "Sprache: Deutsch"
+        break
+        ;;
+      EN)
+        LANGUAGE="EN"
+        log_info "Language: English"
+        break
+        ;;
+      *)
+        printf 'Bitte "DE" oder "EN" eingeben / Please type "DE" or "EN".\n'
+        ;;
+    esac
+  done
+}
+
+load_existing_env_values() {
+  EXISTING_ENV_VALUES=()
+
+  if (( FORCE_ENV )); then
+    return
+  fi
+
+  if [[ ! -f "$ENV_FILE" ]]; then
+    return
+  fi
+
+  while IFS='=' read -r key value; do
+    if [[ -z "$key" || "$key" == '#'* ]]; then
+      continue
+    fi
+    EXISTING_ENV_VALUES["$key"]="$value"
+  done <"$ENV_FILE"
+}
+
+get_env_default() {
+  case "$1" in
+    DB_ROOT_PASSWORD) echo "" ;;
+    DB_NAME) echo "opsi" ;;
+    DB_USER) echo "opsi" ;;
+    DB_PASSWORD) echo "" ;;
+    DB_PORT) echo "3306" ;;
+    OPSI_ADMIN_USER) echo "opsiadmin" ;;
+    OPSI_ADMIN_PASSWORD) echo "" ;;
+    OPSI_SERVER_FQDN) echo "opsi.local" ;;
+    OPSI_API_PORT) echo "4447" ;;
+    OPSI_DEPOT_PORT) echo "4441" ;;
+    OPSI_WEBUI_PORT) echo "4443" ;;
+    OPSI_SERVER_IMAGE) echo "uibmz/opsi-server:4.2" ;;
+    AGENT_SECRET) echo "ChangeMeAgentSecret!" ;;
+    AGENT_POLL_INTERVAL) echo "3600" ;;
+    PXE_HTTP_PORT) echo "8080" ;;
+    PXE_TFTP_PORT) echo "69" ;;
+    SERVICE_UID) echo "0" ;;
+    SERVICE_GID) echo "0" ;;
+    TIMEZONE) echo "UTC" ;;
+    PXE_IMAGE) echo "ghcr.io/linuxserver/tftp:latest" ;;
+    *) echo "" ;;
+  esac
+}
+
+is_env_required() {
+  case "$1" in
+    DB_ROOT_PASSWORD|DB_PASSWORD|OPSI_ADMIN_PASSWORD)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_env_secret() {
+  case "$1" in
+    DB_ROOT_PASSWORD|DB_PASSWORD|OPSI_ADMIN_PASSWORD|AGENT_SECRET)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+warn_required_input() {
+  if language_is_de; then
+    log_warn "Dieser Wert ist erforderlich."
+  else
+    log_warn "This value is required."
+  fi
+}
+
+warn_invalid_port() {
+  if language_is_de; then
+    log_warn "Bitte eine gültige Portnummer zwischen 1 und 65535 eingeben."
+  else
+    log_warn "Please provide a valid port number between 1 and 65535."
+  fi
+}
+
+warn_invalid_integer() {
+  if language_is_de; then
+    log_warn "Bitte eine gültige Ganzzahl größer oder gleich 0 eingeben."
+  else
+    log_warn "Please provide a valid integer greater than or equal to 0."
+  fi
+}
+
+build_prompt() {
+  local var="$1"
+  local default_value="$2"
+  local label=""
+
+  if language_is_de; then
+    case "$var" in
+      DB_ROOT_PASSWORD) label="Datenbank-Root-Passwort" ;;
+      DB_NAME) label="Name der OPSI-Datenbank" ;;
+      DB_USER) label="Datenbankbenutzer" ;;
+      DB_PASSWORD) label="Passwort für den Datenbankbenutzer" ;;
+      DB_PORT) label="Datenbank-Portnummer" ;;
+      OPSI_ADMIN_USER) label="OPSI-Administratorbenutzer" ;;
+      OPSI_ADMIN_PASSWORD) label="Passwort für den OPSI-Administrator" ;;
+      OPSI_SERVER_FQDN) label="FQDN des OPSI-Servers" ;;
+      OPSI_API_PORT) label="Port für die OPSI Config API" ;;
+      OPSI_DEPOT_PORT) label="OPSI-Depot-Port" ;;
+      OPSI_WEBUI_PORT) label="Port für die OPSI Weboberfläche" ;;
+      OPSI_SERVER_IMAGE) label="Container-Image für den OPSI-Server" ;;
+      AGENT_SECRET) label="Agent-Secret für Client-Registrierung (Änderung empfohlen)" ;;
+      AGENT_POLL_INTERVAL) label="Abfrageintervall des Agenten in Sekunden" ;;
+      PXE_HTTP_PORT) label="HTTP-Port für PXE-Bereitstellung" ;;
+      PXE_TFTP_PORT) label="UDP-Port für PXE/TFTP" ;;
+      SERVICE_UID) label="UID für Container-Dienste" ;;
+      SERVICE_GID) label="GID für Container-Dienste" ;;
+      TIMEZONE) label="Zeitzone (z. B. Europe/Berlin)" ;;
+      PXE_IMAGE) label="Container-Image für den PXE-Dienst" ;;
+      *) label="$var" ;;
+    esac
+
+    if is_env_required "$var"; then
+      label+=" (Pflichtfeld)"
+    fi
+
+    if [[ -n "$default_value" ]]; then
+      label+=" [Standard: $default_value]"
+    fi
+
+    printf '%s: ' "$label"
+  else
+    case "$var" in
+      DB_ROOT_PASSWORD) label="Database root password" ;;
+      DB_NAME) label="OPSI database name" ;;
+      DB_USER) label="Database user" ;;
+      DB_PASSWORD) label="Password for the database user" ;;
+      DB_PORT) label="Database port number" ;;
+      OPSI_ADMIN_USER) label="OPSI administrator user" ;;
+      OPSI_ADMIN_PASSWORD) label="Password for the OPSI administrator" ;;
+      OPSI_SERVER_FQDN) label="Fully qualified domain name of the OPSI server" ;;
+      OPSI_API_PORT) label="Port for the OPSI Config API" ;;
+      OPSI_DEPOT_PORT) label="OPSI depot port" ;;
+      OPSI_WEBUI_PORT) label="Port for the OPSI web interface" ;;
+      OPSI_SERVER_IMAGE) label="Container image for the OPSI server" ;;
+      AGENT_SECRET) label="Agent secret for client registration (change recommended)" ;;
+      AGENT_POLL_INTERVAL) label="Agent polling interval in seconds" ;;
+      PXE_HTTP_PORT) label="HTTP port for PXE provisioning" ;;
+      PXE_TFTP_PORT) label="UDP port for PXE/TFTP" ;;
+      SERVICE_UID) label="UID for container services" ;;
+      SERVICE_GID) label="GID for container services" ;;
+      TIMEZONE) label="Timezone (e.g. Europe/Berlin)" ;;
+      PXE_IMAGE) label="Container image for the PXE service" ;;
+      *) label="$var" ;;
+    esac
+
+    if is_env_required "$var"; then
+      label+=" (required)"
+    fi
+
+    if [[ -n "$default_value" ]]; then
+      label+=" [default: $default_value]"
+    fi
+
+    printf '%s: ' "$label"
+  fi
+}
+
+validate_env_value() {
+  local var="$1"
+  local value="$2"
+  local numeric_value=0
+
+  case "$var" in
+    DB_PORT|OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_WEBUI_PORT|PXE_HTTP_PORT|PXE_TFTP_PORT)
+      if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+        warn_invalid_port
+        return 1
+      fi
+      numeric_value=$((10#$value))
+      if (( numeric_value < 1 || numeric_value > 65535 )); then
+        warn_invalid_port
+        return 1
+      fi
+      ;;
+    SERVICE_UID|SERVICE_GID|AGENT_POLL_INTERVAL)
+      if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+        warn_invalid_integer
+        return 1
+      fi
+      ;;
+  esac
+
+  return 0
+}
+
+prompt_env_var() {
+  local var="$1"
+  local default_value="$2"
+  local value=""
+
+  while true; do
+    build_prompt "$var" "$default_value"
+    if is_env_secret "$var"; then
+      read -r -s value
+      printf '\n'
+    else
+      read -r value
+    fi
+
+    if [[ -z "$value" ]]; then
+      value="$default_value"
+    fi
+
+    if [[ -z "$value" ]] && is_env_required "$var"; then
+      warn_required_input
+      continue
+    fi
+
+    if [[ -n "$value" ]] && ! validate_env_value "$var" "$value"; then
+      continue
+    fi
+
+    ENV_VALUES["$var"]="$value"
+    break
+  done
+}
+
+display_env_summary() {
+  if language_is_de; then
+    log_info "Zusammenfassung der gewählten Einstellungen:"
+  else
+    log_info "Summary of selected settings:"
+  fi
+
+  local hidden_label="(hidden)"
+  if language_is_de; then
+    hidden_label="(versteckt)"
+  fi
+
+  for var in "${ENV_VARIABLES[@]}"; do
+    local value="${ENV_VALUES[$var]-}"
+    if is_env_secret "$var" && [[ -n "$value" ]]; then
+      printf '  %s=%s\n' "$var" "$hidden_label"
+    else
+      printf '  %s=%s\n' "$var" "$value"
+    fi
+  done
+}
+
+prompt_yes_no() {
+  local question="$1"
+  local default_answer="$2"
+  local prompt=""
+  local answer=""
+
+  if language_is_de; then
+    if [[ "$default_answer" == "y" ]]; then
+      prompt="$question [J/n]: "
+    else
+      prompt="$question [j/N]: "
+    fi
+  else
+    if [[ "$default_answer" == "y" ]]; then
+      prompt="$question [Y/n]: "
+    else
+      prompt="$question [y/N]: "
+    fi
+  fi
+
+  while true; do
+    read -r -p "$prompt" answer
+    if [[ -z "$answer" ]]; then
+      answer="$default_answer"
+    fi
+
+    case "${answer,,}" in
+      y|yes|j|ja)
+        return 0
+        ;;
+      n|no|nein)
+        return 1
+        ;;
+      *)
+        if language_is_de; then
+          printf 'Bitte mit "j"/"n" antworten.\n'
+        else
+          printf 'Please answer with "y"/"n".\n'
+        fi
+        ;;
+    esac
+  done
+}
+
+write_env_file() {
+  if (( DRY_RUN )); then
+    log_info "[dry-run] Would write configuration to ${ENV_FILE}"
+    return
+  fi
+
+  if [[ -f "$ENV_FILE" ]]; then
+    local backup="${ENV_FILE}.bak.$(date +%Y%m%d%H%M%S)"
+    cp "$ENV_FILE" "$backup"
+    if language_is_de; then
+      log_info "Bestehende Datei nach $backup gesichert."
+    else
+      log_info "Existing file backed up to $backup."
+    fi
+  fi
+
+  local tmp_file
+  tmp_file="$(mktemp "${ENV_FILE}.XXXX")"
+
+  {
+    printf '# Generated by opsisuit-installer on %s\n' "$(date -Iseconds)"
+    for var in "${ENV_VARIABLES[@]}"; do
+      printf '%s=%s\n' "$var" "${ENV_VALUES[$var]-}"
+    done
+  } >"$tmp_file"
+
+  mv "$tmp_file" "$ENV_FILE"
+
+  if language_is_de; then
+    log_info "Konfigurationswerte in ${ENV_FILE} geschrieben."
+  else
+    log_info "Configuration values written to ${ENV_FILE}."
+  fi
+}
+
+ensure_env_file() {
+  load_existing_env_values
+
+  if language_is_de; then
+    log_info "Interaktiver Installer gestartet."
+    log_info "Drücken Sie Enter, um vorgeschlagene Standardwerte zu übernehmen."
+    if (( FORCE_ENV )); then
+      log_info "Vorhandene Werte werden aufgrund von --force-env ignoriert."
+    elif [[ -f "$ENV_FILE" ]]; then
+      log_info "Vorhandene Werte werden als Vorschläge angezeigt."
+    fi
+  else
+    log_info "Interactive installer started."
+    log_info "Press Enter to accept the suggested defaults."
+    if (( FORCE_ENV )); then
+      log_info "Existing values are ignored because --force-env is set."
+    elif [[ -f "$ENV_FILE" ]]; then
+      log_info "Existing values are presented as suggestions."
+    fi
+  fi
+
+  ENV_VALUES=()
+
+  for var in "${ENV_VARIABLES[@]}"; do
+    local default_value=""
+    if (( ! FORCE_ENV )) && [[ -v EXISTING_ENV_VALUES[$var] ]]; then
+      default_value="${EXISTING_ENV_VALUES[$var]}"
+    else
+      default_value="$(get_env_default "$var")"
+    fi
+
+    prompt_env_var "$var" "$default_value"
+  done
+
+  display_env_summary
+
+  local question=""
+  if language_is_de; then
+    question="Konfiguration in ${ENV_FILE} schreiben?"
+  else
+    question="Write configuration to ${ENV_FILE}?"
+  fi
+
+  if prompt_yes_no "$question" "y"; then
+    write_env_file
+  else
+    if language_is_de; then
+      log_error "Installer abgebrochen, keine Änderungen vorgenommen."
+    else
+      log_error "Installer aborted, no changes applied."
+    fi
+    exit 1
+  fi
+}
+
 usage() {
   cat <<'USAGE'
 OpsiSuit Installer
@@ -43,7 +481,8 @@ OpsiSuit Installer
 
 Bootstraps the OpsiSuit Docker stack. The installer checks required
 dependencies, prepares configuration files and, unless told otherwise,
-starts the Docker Compose stack.
+starts the Docker Compose stack. The script interactively collects
+environment-specific settings in German or English.
 
 Usage: scripts/opsisuit-installer.sh [options]
 
@@ -52,8 +491,7 @@ Options:
                          package manager (requires root).
   --dry-run              Print the actions without modifying the system.
   --skip-start           Do not start the Docker Compose stack.
-  --force-env            Overwrite an existing docker/.env file with the
-                         template.
+  --force-env            Ignore existing docker/.env values when prompting.
   --force-config         Overwrite generated configuration files with the
                          templates in configs/.
   -h, --help             Show this help message.
@@ -148,15 +586,6 @@ copy_template() {
     cp "$template" "$destination"
     log_info "Provisioned $destination from template"
   fi
-}
-
-ensure_env_file() {
-  if [[ ! -f "$ENV_TEMPLATE" ]]; then
-    log_error "Environment template $ENV_TEMPLATE not found"
-    exit 1
-  fi
-
-  copy_template "$ENV_TEMPLATE" "$ENV_FILE" "$FORCE_ENV"
 }
 
 ensure_config_templates() {
@@ -522,8 +951,9 @@ bring_up_stack() {
 main() {
   parse_args "$@"
 
-  ensure_directories
+  select_language
   ensure_env_file
+  ensure_directories
   ensure_config_templates
   ensure_dependencies
   bring_up_stack
