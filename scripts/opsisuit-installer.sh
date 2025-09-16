@@ -134,8 +134,8 @@ get_env_default() {
     PXE_HTTP_PORT) echo "8080" ;;
     PXE_WEBAPP_PORT) echo "3000" ;;
     PXE_TFTP_PORT) echo "69" ;;
-    SERVICE_UID) echo "0" ;;
-    SERVICE_GID) echo "0" ;;
+    SERVICE_UID) echo "1000" ;;
+    SERVICE_GID) echo "1000" ;;
     TIMEZONE) echo "UTC" ;;
     PXE_IMAGE) echo "netbootxyz/netbootxyz:latest" ;;
     *) echo "" ;;

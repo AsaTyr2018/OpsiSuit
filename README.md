@@ -97,6 +97,11 @@ Konfigurationsdateien überschreiben.
 3. `configs/pxe/pxe.conf` – Beispielkonfiguration für dnsmasq/TFTP.
 4. `configs/agent/client-agent.conf` – Vorgaben für den OPSI-Client-Agenten.
 
+> **Hinweis:** Für den PXE-Container (`netboot.xyz`) muss `SERVICE_UID`/`SERVICE_GID`
+> auf eine reguläre Benutzer-/Gruppen-ID zeigen. Die Standardwerte (`1000`) vermeiden
+> den Fehler `Invalid user name nbxyz` beim Start von `supervisord`. Passen Sie die IDs
+> bei Bedarf an die UID/GID Ihres Docker-Hosts an.
+
 Alle Dateien werden beim ersten Lauf des Installers aus den jeweiligen
 `.example`-Vorlagen kopiert und können anschließend editiert werden.
 
