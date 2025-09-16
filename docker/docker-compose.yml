@@ -24,12 +24,30 @@ services:
         aliases:
           - db
 
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: opsisuit-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    volumes:
+      - ../data/redis:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      opsisuit:
+        aliases:
+          - redis
+
   opsi-server:
     image: ${OPSI_SERVER_IMAGE:-uibmz/opsi-server:4.2}
     container_name: opsisuit-server
     restart: unless-stopped
     depends_on:
       - db
+      - redis
     environment:
       OPSI_ADMIN_USER: ${OPSI_ADMIN_USER:-opsiadmin}
       OPSI_ADMIN_PASSWORD: ${OPSI_ADMIN_PASSWORD:?OPSI_ADMIN_PASSWORD is required}
@@ -38,6 +56,8 @@ services:
       OPSI_DB_NAME: ${DB_NAME:-opsi}
       OPSI_DB_USER: ${DB_USER:-opsi}
       OPSI_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      OPSI_REDIS_HOST: redis
+      OPSI_REDIS_PORT: ${REDIS_PORT:-6379}
       AGENT_SECRET: ${AGENT_SECRET:-ChangeMeAgentSecret!}
       AGENT_POLL_INTERVAL: ${AGENT_POLL_INTERVAL:-3600}
     volumes:

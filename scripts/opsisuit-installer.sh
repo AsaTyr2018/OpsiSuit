@@ -30,6 +30,8 @@ ENV_VARIABLES=(
   DB_USER
   DB_PASSWORD
   DB_PORT
+  REDIS_IMAGE
+  REDIS_PORT
   OPSI_ADMIN_USER
   OPSI_ADMIN_PASSWORD
   OPSI_SERVER_FQDN
@@ -118,6 +120,8 @@ get_env_default() {
     DB_USER) echo "opsi" ;;
     DB_PASSWORD) echo "" ;;
     DB_PORT) echo "3306" ;;
+    REDIS_IMAGE) echo "redis:7-alpine" ;;
+    REDIS_PORT) echo "6379" ;;
     OPSI_ADMIN_USER) echo "opsiadmin" ;;
     OPSI_ADMIN_PASSWORD) echo "" ;;
     OPSI_SERVER_FQDN) echo "opsi.local" ;;
@@ -196,6 +200,8 @@ build_prompt() {
       DB_USER) label="Datenbankbenutzer" ;;
       DB_PASSWORD) label="Passwort für den Datenbankbenutzer" ;;
       DB_PORT) label="Datenbank-Portnummer" ;;
+      REDIS_IMAGE) label="Container-Image für Redis" ;;
+      REDIS_PORT) label="Redis-Portnummer" ;;
       OPSI_ADMIN_USER) label="OPSI-Administratorbenutzer" ;;
       OPSI_ADMIN_PASSWORD) label="Passwort für den OPSI-Administrator" ;;
       OPSI_SERVER_FQDN) label="FQDN des OPSI-Servers" ;;
@@ -231,6 +237,8 @@ build_prompt() {
       DB_USER) label="Database user" ;;
       DB_PASSWORD) label="Password for the database user" ;;
       DB_PORT) label="Database port number" ;;
+      REDIS_IMAGE) label="Container image for Redis" ;;
+      REDIS_PORT) label="Redis port number" ;;
       OPSI_ADMIN_USER) label="OPSI administrator user" ;;
       OPSI_ADMIN_PASSWORD) label="Password for the OPSI administrator" ;;
       OPSI_SERVER_FQDN) label="Fully qualified domain name of the OPSI server" ;;
@@ -268,7 +276,7 @@ validate_env_value() {
   local numeric_value=0
 
   case "$var" in
-    DB_PORT|OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_WEBUI_PORT|PXE_HTTP_PORT|PXE_WEBAPP_PORT|PXE_TFTP_PORT)
+    DB_PORT|REDIS_PORT|OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_WEBUI_PORT|PXE_HTTP_PORT|PXE_WEBAPP_PORT|PXE_TFTP_PORT)
       if [[ ! "$value" =~ ^[0-9]+$ ]]; then
         warn_invalid_port
         return 1
@@ -555,6 +563,7 @@ ensure_directories() {
     "$DATA_DIR/db"
     "$DATA_DIR/opsi"
     "$DATA_DIR/pxe"
+    "$DATA_DIR/redis"
     "$LOG_DIR"
     "$LOG_DIR/opsi-server"
     "$BACKUP_DIR"

@@ -17,6 +17,7 @@ vereinfachen soll.
 | Service       | Beschreibung                                                                 |
 |---------------|------------------------------------------------------------------------------|
 | `db`          | MariaDB 10.11 als zentrales Backend für OPSI.                                |
+| `redis`       | Redis 7 als In-Memory-Cache und Message-Broker für den OPSI-Server.          |
 | `opsi-server` | OPSI-Server inklusive Config-API und Depot. Greift auf DB und Konfigurationen zu. |
 | `pxe`         | netboot.xyz TFTP/HTTP-Service mit Webinterface (Standard: `netbootxyz/netbootxyz`). |
 
