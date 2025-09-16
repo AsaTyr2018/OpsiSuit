@@ -23,6 +23,7 @@ APT_UPDATED=0
 LANGUAGE=""
 declare -A EXISTING_ENV_VALUES=()
 declare -A ENV_VALUES=()
+GENERATED_AGENT_SECRET=""
 
 ENV_VARIABLES=(
   DB_ROOT_PASSWORD
@@ -52,10 +53,23 @@ ENV_VARIABLES=(
 )
 
 MISSION_CRITICAL_VARS=(
+  DB_ROOT_PASSWORD
+  DB_USER
+  DB_PASSWORD
+  DB_PORT
+  REDIS_IMAGE
+  REDIS_PORT
+  REDIS_SERVICE_PORT
   OPSI_API_PORT
   OPSI_DEPOT_PORT
-  REDIS_SERVICE_PORT
+  OPSI_SERVER_IMAGE
+  AGENT_SECRET
+  PXE_HTTP_PORT
+  PXE_WEBAPP_PORT
   PXE_TFTP_PORT
+  SERVICE_UID
+  SERVICE_GID
+  PXE_IMAGE
 )
 
 declare -a MISSING_DEPENDENCIES=()
@@ -164,7 +178,11 @@ is_env_required() {
 
 is_mission_critical_var() {
   case "$1" in
-    OPSI_API_PORT|OPSI_DEPOT_PORT|REDIS_SERVICE_PORT|PXE_TFTP_PORT)
+    DB_ROOT_PASSWORD|DB_USER|DB_PASSWORD|DB_PORT|\
+    REDIS_IMAGE|REDIS_PORT|REDIS_SERVICE_PORT|\
+    OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_SERVER_IMAGE|\
+    AGENT_SECRET|PXE_HTTP_PORT|PXE_WEBAPP_PORT|\
+    PXE_TFTP_PORT|SERVICE_UID|SERVICE_GID|PXE_IMAGE)
       return 0
       ;;
     *)
@@ -214,6 +232,78 @@ warn_invalid_fqdn() {
   else
     log_warn "Please provide a fully qualified domain name (e.g. opsi.example.local)."
   fi
+}
+
+generate_random_string() {
+  local length=${1:-32}
+  local value=""
+
+  if command -v python3 >/dev/null 2>&1; then
+    value="$(python3 - "$length" <<'PY'
+import secrets, string, sys
+length = int(sys.argv[1])
+alphabet = string.ascii_letters + string.digits
+print(''.join(secrets.choice(alphabet) for _ in range(length)))
+PY
+)"
+  elif command -v python >/dev/null 2>&1; then
+    value="$(python - "$length" <<'PY'
+import secrets, string, sys
+length = int(sys.argv[1])
+alphabet = string.ascii_letters + string.digits
+print(''.join(secrets.choice(alphabet) for _ in range(length)))
+PY
+)"
+  else
+    value="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length")"
+  fi
+
+  if [[ -z "$value" || ${#value} -lt $length ]]; then
+    log_error "Failed to generate random string of length $length"
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+generate_db_username() {
+  local random_part
+  random_part="$(generate_random_string 10)"
+  printf 'opsi_%s' "$random_part"
+}
+
+generate_secure_password() {
+  local length=${1:-32}
+  generate_random_string "$length"
+}
+
+generate_agent_secret() {
+  generate_secure_password 48
+}
+
+generate_mission_critical_value() {
+  local var="$1"
+
+  case "$var" in
+    DB_ROOT_PASSWORD)
+      generate_secure_password 32
+      ;;
+    DB_PASSWORD)
+      generate_secure_password 32
+      ;;
+    DB_USER)
+      generate_db_username
+      ;;
+    AGENT_SECRET)
+      local secret
+      secret="$(generate_agent_secret)"
+      GENERATED_AGENT_SECRET="$secret"
+      printf '%s' "$secret"
+      ;;
+    *)
+      printf '%s' "$(get_env_default "$var")"
+      ;;
+  esac
 }
 
 build_prompt() {
@@ -386,9 +476,9 @@ display_env_summary() {
       local suffix=""
       if is_mission_critical_var "$var"; then
         if language_is_de; then
-          suffix=" (fixiert)"
+          suffix=" (missionskritisch)"
         else
-          suffix=" (fixed)"
+          suffix=" (mission critical)"
         fi
       fi
       printf '  %s=%s%s\n' "$var" "$value" "$suffix"
@@ -583,16 +673,49 @@ ensure_env_file() {
 
   if (( ${#MISSION_CRITICAL_VARS[@]} )); then
     if language_is_de; then
-      log_info "Folgende missionskritische Variablen verwenden feste Standardwerte und werden nicht abgefragt:"
+      log_info "Folgende missionskritische Variablen werden automatisch verwaltet und nicht abgefragt:"
     else
-      log_info "The following mission critical variables use fixed default values and are not prompted:"
+      log_info "The following mission critical variables are managed automatically and are not prompted:"
     fi
 
     for critical_var in "${MISSION_CRITICAL_VARS[@]}"; do
-      local mission_default=""
-      mission_default="$(get_env_default "$critical_var")"
-      log_info "  ${critical_var}=${mission_default}"
-      ENV_VALUES["$critical_var"]="$mission_default"
+      local managed_value=""
+      local reuse_existing_value=0
+
+      if (( ! ignore_existing_defaults )) && [[ -v EXISTING_ENV_VALUES[$critical_var] ]]; then
+        managed_value="${EXISTING_ENV_VALUES[$critical_var]}"
+        reuse_existing_value=1
+      else
+        managed_value="$(generate_mission_critical_value "$critical_var")"
+      fi
+
+      ENV_VALUES["$critical_var"]="$managed_value"
+
+      local display_value="$managed_value"
+      if is_env_secret "$critical_var" && [[ -n "$display_value" ]]; then
+        if language_is_de; then
+          display_value="(versteckt)"
+        else
+          display_value="(hidden)"
+        fi
+      fi
+
+      local note=""
+      if (( reuse_existing_value )); then
+        if language_is_de; then
+          note=" (bestehender Wert)"
+        else
+          note=" (existing value)"
+        fi
+      else
+        if language_is_de; then
+          note=" (automatisch gesetzt)"
+        else
+          note=" (auto-managed)"
+        fi
+      fi
+
+      log_info "  ${critical_var}=${display_value}${note}"
     done
   fi
 
@@ -600,8 +723,6 @@ ensure_env_file() {
     local default_value=""
 
     if is_mission_critical_var "$var"; then
-      default_value="$(get_env_default "$var")"
-      ENV_VALUES["$var"]="$default_value"
       continue
     fi
 
@@ -1121,6 +1242,14 @@ main() {
   bring_up_stack
 
   log_info "OpsiSuit installer finished"
+
+  if [[ -n "$GENERATED_AGENT_SECRET" ]]; then
+    if language_is_de; then
+      log_info "Agent-Secret für neue Installationen: ${GENERATED_AGENT_SECRET}"
+    else
+      log_info "Agent secret for new installations: ${GENERATED_AGENT_SECRET}"
+    fi
+  fi
 }
 
 main "$@"
