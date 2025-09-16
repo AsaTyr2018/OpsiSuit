@@ -6,14 +6,14 @@ run-as-user = opsiconfd
 # Bind to all available network interfaces.
 interface = 0.0.0.0
 
-# Plain HTTP listener used by depot/file services.
-port = @OPSI_DEPOT_PORT@
+# Plain HTTP listener used by depot/file services (container-internal port).
+port = @OPSI_DEPOT_INTERNAL_PORT@
 
-# Enable TLS endpoints (JSON-RPC, admin UI, WebDAV, etc.).
-ssl = true
-ssl-port = @OPSI_API_PORT@
-
-# The default certificate and key provided by the opsi server image are reused.
-# Uncomment the lines below to override the certificate locations if required.
-# ssl-server-key = /etc/opsi/ssl/opsiconfd.pem
-# ssl-server-cert = /etc/opsi/ssl/opsiconfd.pem
+# TLS endpoints (JSON-RPC, admin UI, WebDAV, etc.).
+# The daemon starts the HTTPS listener automatically as soon as valid
+# certificates exist under /etc/opsi/ssl/.
+ssl-port = @OPSI_API_INTERNAL_PORT@
+ssl-server-key = @OPSI_SSL_KEY_PATH@
+ssl-server-cert = @OPSI_SSL_CERT_PATH@
+ssl-ca-cert = @OPSI_SSL_CA_PATH@
+ssl-trusted-certs = /etc/ssl/certs/ca-certificates.crt

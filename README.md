@@ -30,7 +30,7 @@ OpsiSuit bundles everything required to bootstrap an OPSI environment. It ships 
 - **Container-first design:** Deploy every service through Docker Compose with sensible defaults and isolated volumes.
 - **Guided installer:** `scripts/opsisuit-installer.sh` provisions configuration, validates prerequisites, and starts the stack with a single command.
 - **Editable templates:** Example configuration files for OPSI, PXE/TFTP, and the client agent are copied locally and version controlled via `.gitignore` so you can iterate safely.
-- **Secure-by-default defaults:** Critical ports, Redis connectivity, and `opsiconfd` arguments are pre-populated to avoid fragile setups.
+- **Secure-by-default defaults:** Critical ports, Redis connectivity, `opsiconfd` arguments, and a self-signed HTTPS certificate are pre-populated to avoid fragile setups.
 - **Extensible foundation:** Additional services (monitoring, web frontends, inventory extensions) can be layered on top of the provided structure.
 
 ## Roadmap & Progress
