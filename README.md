@@ -103,6 +103,17 @@ The installer executes the following steps:
 
 Use `--force-env` or `--force-config` to overwrite existing `.env` or configuration files.
 
+### Rollback & Reset
+
+```bash
+# Preview cleanup steps without executing them
+./scripts/opsisuit-rollback.sh --dry-run
+
+# Fully remove containers, data, and generated configuration
+./scripts/opsisuit-rollback.sh --yes
+```
+The rollback script stops all OpsiSuit containers, removes generated configuration files (keeping the `.example` templates), and clears `data/`, `logs/`, `backups/`, and `tmp/` so that you can start again from a pristine example state.
+
 ## Configuration Guide
 1. **`docker/.env`** – Contains ports, passwords, image tags, and secrets. The installer pre-populates `OPSICONFD_ARGS` with `--config-file=/etc/opsi/opsiconfd.conf` so that `opsiconfd` reads the rendered configuration instead of relying on the deprecated `--ssl` flag.
 2. **`configs/opsi/opsi.conf`** – Global OPSI settings. Copy additional snippets into `data/opsi/etc/conf.d/` once generated.
