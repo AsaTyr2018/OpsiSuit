@@ -34,6 +34,11 @@ services:
       - "yes"
       - --port
       - "${REDIS_SERVICE_PORT:-6379}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - ../data/redis:/data
     ports:
@@ -48,8 +53,10 @@ services:
     container_name: opsisuit-server
     restart: unless-stopped
     depends_on:
-      - db
-      - redis
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_started
     environment:
       OPSI_ADMIN_USER: ${OPSI_ADMIN_USER:-opsiadmin}
       OPSI_ADMIN_PASSWORD: ${OPSI_ADMIN_PASSWORD:?OPSI_ADMIN_PASSWORD is required}
