@@ -91,7 +91,11 @@ configuration files.
 ## Adjusting the Configuration
 
 1. `docker/.env` – central variables for the compose stack
-   (ports, passwords, image tags, secrets).
+   (ports, passwords, image tags, secrets). The installer now
+   pre-populates `OPSICONFD_ARGS` with
+   `--config-file=/etc/opsi/opsiconfd.conf` so that the containerized
+   `opsiconfd` process reads the rendered configuration file instead of
+   relying on the deprecated `--ssl` flag.
 2. `configs/opsi/opsi.conf` – sample snippet for global OPSI settings
    (copy to `data/opsi/etc/conf.d/` if needed).
 3. `configs/pxe/pxe.conf` – sample configuration for dnsmasq/TFTP.
