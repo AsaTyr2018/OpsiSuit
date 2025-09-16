@@ -45,6 +45,21 @@ gelegt und sind per `.gitignore` vom Repository ausgeschlossen.
 - Docker und Docker Compose (Plugin oder `docker-compose`).
 - `curl` und `git`.
 
+**Kurzinstallation (Debian/Ubuntu):**
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose-plugin curl git
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+```
+
+> Nach dem Hinzufügen zur `docker`-Gruppe ist eine neue Terminal-Sitzung nötig,
+> damit die Berechtigungen greifen.
+
+Installationshinweise für weitere Distributionen stehen in
+[docs/requirements-installation.md](docs/requirements-installation.md).
+
 Das Installer-Skript kann fehlende Pakete optional automatisch nachinstallieren.
 
 ## Installer verwenden
