@@ -65,8 +65,7 @@ services:
       OPSI_DB_NAME: ${DB_NAME:-opsi}
       OPSI_DB_USER: ${DB_USER:-opsi}
       OPSI_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-      OPSI_REDIS_HOST: redis
-      OPSI_REDIS_PORT: ${REDIS_SERVICE_PORT:-6379}
+      OPSICONFD_REDIS_URL: redis://redis:${REDIS_SERVICE_PORT:-6379}/0
       AGENT_SECRET: ${AGENT_SECRET:-ChangeMeAgentSecret!}
       AGENT_POLL_INTERVAL: ${AGENT_POLL_INTERVAL:-3600}
     volumes:

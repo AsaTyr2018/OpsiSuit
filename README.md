@@ -107,7 +107,10 @@ Konfigurationsdateien überschreiben.
 > und werden vom Installer nicht mehr abgefragt. Sie werden automatisch mit ihren
 > Default-Werten in `docker/.env` geschrieben, damit zentrale Dienste zuverlässig
 > miteinander kommunizieren. Exponierte HTTP-Ports (z. B. für Web-UIs) bleiben
-> weiterhin konfigurierbar.
+> weiterhin konfigurierbar. Die Redis-Anbindung des opsiconfd
+> (`OPSICONFD_REDIS_URL`) ist ebenso fest auf
+> `redis://redis:${REDIS_SERVICE_PORT:-6379}/0` gesetzt und wird nicht mehr über
+> `.env` überschrieben.
 
 Alle Dateien werden beim ersten Lauf des Installers aus den jeweiligen
 `.example`-Vorlagen kopiert und können anschließend editiert werden.
