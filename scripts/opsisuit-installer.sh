@@ -208,6 +208,14 @@ warn_invalid_integer() {
   fi
 }
 
+warn_invalid_fqdn() {
+  if language_is_de; then
+    log_warn "Bitte einen vollqualifizierten Domainnamen angeben (z. B. opsi.example.local)."
+  else
+    log_warn "Please provide a fully qualified domain name (e.g. opsi.example.local)."
+  fi
+}
+
 build_prompt() {
   local var="$1"
   local default_value="$2"
@@ -312,6 +320,12 @@ validate_env_value() {
     SERVICE_UID|SERVICE_GID|AGENT_POLL_INTERVAL)
       if [[ ! "$value" =~ ^[0-9]+$ ]]; then
         warn_invalid_integer
+        return 1
+      fi
+      ;;
+    OPSI_SERVER_FQDN)
+      if [[ ! "$value" =~ ^[A-Za-z0-9]([-A-Za-z0-9]*[A-Za-z0-9])?(\.[A-Za-z0-9]([-A-Za-z0-9]*[A-Za-z0-9])?)+$ ]]; then
+        warn_invalid_fqdn
         return 1
       fi
       ;;
