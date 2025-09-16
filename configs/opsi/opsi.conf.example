@@ -1,0 +1,14 @@
+# Example opsi configuration fragment.
+# Copy to configs/opsi/opsi.conf and adjust to your environment.
+
+[global]
+config_service_url = https://${OPSI_SERVER_FQDN:-opsi.local}:4447/rpc
+workbench_user = opsi
+workbench_group = opsi
+repository_localpath = /var/lib/opsi/repository
+
+[depotserver1]
+description = Primary OPSI depot
+storage_user = opsi
+storage_group = opsi
+network_address = 0.0.0.0

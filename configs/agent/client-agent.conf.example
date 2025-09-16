@@ -1,0 +1,8 @@
+# Example opsi client agent configuration.
+# Copy to configs/agent/client-agent.conf and adjust to your needs.
+
+[client]
+server = ${OPSI_SERVER_FQDN:-opsi.local}
+secret = ${AGENT_SECRET:-ChangeMeAgentSecret!}
+poll_interval = ${AGENT_POLL_INTERVAL:-3600}
+use_ssl = true

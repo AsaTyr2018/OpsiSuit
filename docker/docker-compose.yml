@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: opsisuit-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=256M
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      MARIADB_DATABASE: ${DB_NAME:-opsi}
+      MARIADB_USER: ${DB_USER:-opsi}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - ../data/db:/var/lib/mysql
+      - ../backups/db:/backups
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      - opsisuit
+
+  opsi-server:
+    image: ${OPSI_SERVER_IMAGE:-uibmz/opsi-server:4.2}
+    container_name: opsisuit-server
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      OPSI_ADMIN_USER: ${OPSI_ADMIN_USER:-opsiadmin}
+      OPSI_ADMIN_PASSWORD: ${OPSI_ADMIN_PASSWORD:?OPSI_ADMIN_PASSWORD is required}
+      OPSI_FQDN: ${OPSI_SERVER_FQDN:-opsi.local}
+      OPSI_DB_HOST: db
+      OPSI_DB_NAME: ${DB_NAME:-opsi}
+      OPSI_DB_USER: ${DB_USER:-opsi}
+      OPSI_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      AGENT_SECRET: ${AGENT_SECRET:-ChangeMeAgentSecret!}
+      AGENT_POLL_INTERVAL: ${AGENT_POLL_INTERVAL:-3600}
+    volumes:
+      - ../data/opsi:/var/lib/opsi
+      - ../configs/opsi:/etc/opsi/conf.d
+      - ../configs/agent:/etc/opsi/agent.d
+      - ../logs/opsi-server:/var/log/opsi
+    ports:
+      - "${OPSI_API_PORT:-4447}:4447"
+      - "${OPSI_DEPOT_PORT:-4441}:4441"
+      - "${OPSI_WEBUI_PORT:-4443}:4443"
+      - "${PXE_HTTP_PORT:-8080}:8080"
+    networks:
+      - opsisuit
+
+  pxe:
+    image: ${PXE_IMAGE:-ghcr.io/linuxserver/tftp:latest}
+    container_name: opsisuit-pxe
+    restart: unless-stopped
+    environment:
+      PUID: ${SERVICE_UID:-0}
+      PGID: ${SERVICE_GID:-0}
+      TZ: ${TIMEZONE:-UTC}
+    ports:
+      - "${PXE_TFTP_PORT:-69}:69/udp"
+    volumes:
+      - ../data/pxe:/tftpboot
+      - ../configs/pxe:/config
+    networks:
+      - opsisuit
+
+networks:
+  opsisuit:
+    driver: bridge
