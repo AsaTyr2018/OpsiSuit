@@ -165,6 +165,22 @@ get_env_default() {
   esac
 }
 
+get_effective_env_value() {
+  local var="$1"
+
+  if [[ -n "${ENV_VALUES[$var]:-}" ]]; then
+    echo "${ENV_VALUES[$var]}"
+    return
+  fi
+
+  if [[ -n "${EXISTING_ENV_VALUES[$var]:-}" ]]; then
+    echo "${EXISTING_ENV_VALUES[$var]}"
+    return
+  fi
+
+  get_env_default "$var"
+}
+
 is_env_required() {
   case "$1" in
     DB_ROOT_PASSWORD|DB_PASSWORD|OPSI_ADMIN_PASSWORD)
@@ -875,10 +891,46 @@ copy_template() {
   fi
 }
 
+render_opsiconfd_conf() {
+  local template="$CONFIG_DIR/opsi/opsiconfd.conf.example"
+  local destination="$DATA_DIR/opsi/etc/opsiconfd.conf"
+
+  if [[ ! -f "$template" ]]; then
+    log_warn "Template $template is missing; skipping opsiconfd configuration"
+    return
+  fi
+
+  if [[ -f "$destination" && $FORCE_CONFIG -eq 0 ]]; then
+    log_info "Existing $destination detected; leaving untouched"
+    return
+  fi
+
+  if (( DRY_RUN )); then
+    log_info "[dry-run] Would render opsiconfd configuration to $destination"
+    return
+  fi
+
+  local api_port depot_port tmp_file
+  api_port="$(get_effective_env_value OPSI_API_PORT)"
+  depot_port="$(get_effective_env_value OPSI_DEPOT_PORT)"
+
+  tmp_file="$(mktemp "${destination}.XXXX")"
+
+  while IFS= read -r line; do
+    line=${line//@OPSI_API_PORT@/$api_port}
+    line=${line//@OPSI_DEPOT_PORT@/$depot_port}
+    printf '%s\n' "$line"
+  done <"$template" >"$tmp_file"
+
+  mv "$tmp_file" "$destination"
+  log_info "Rendered $destination from template"
+}
+
 ensure_config_templates() {
   copy_template "$CONFIG_DIR/opsi/opsi.conf.example" "$CONFIG_DIR/opsi/opsi.conf" "$FORCE_CONFIG"
   copy_template "$CONFIG_DIR/pxe/pxe.conf.example" "$CONFIG_DIR/pxe/pxe.conf" "$FORCE_CONFIG"
   copy_template "$CONFIG_DIR/agent/client-agent.conf.example" "$CONFIG_DIR/agent/client-agent.conf" "$FORCE_CONFIG"
+  render_opsiconfd_conf
 }
 
 detect_package_manager() {
