@@ -51,6 +51,13 @@ ENV_VARIABLES=(
   PXE_IMAGE
 )
 
+MISSION_CRITICAL_VARS=(
+  OPSI_API_PORT
+  OPSI_DEPOT_PORT
+  REDIS_SERVICE_PORT
+  PXE_TFTP_PORT
+)
+
 declare -a MISSING_DEPENDENCIES=()
 declare -a DOCKER_COMPOSE_CMD=()
 
@@ -147,6 +154,17 @@ get_env_default() {
 is_env_required() {
   case "$1" in
     DB_ROOT_PASSWORD|DB_PASSWORD|OPSI_ADMIN_PASSWORD)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_mission_critical_var() {
+  case "$1" in
+    OPSI_API_PORT|OPSI_DEPOT_PORT|REDIS_SERVICE_PORT|PXE_TFTP_PORT)
       return 0
       ;;
     *)
@@ -351,7 +369,15 @@ display_env_summary() {
     if is_env_secret "$var" && [[ -n "$value" ]]; then
       printf '  %s=%s\n' "$var" "$hidden_label"
     else
-      printf '  %s=%s\n' "$var" "$value"
+      local suffix=""
+      if is_mission_critical_var "$var"; then
+        if language_is_de; then
+          suffix=" (fixiert)"
+        else
+          suffix=" (fixed)"
+        fi
+      fi
+      printf '  %s=%s%s\n' "$var" "$value" "$suffix"
     fi
   done
 }
@@ -541,8 +567,30 @@ ensure_env_file() {
 
   ENV_VALUES=()
 
+  if (( ${#MISSION_CRITICAL_VARS[@]} )); then
+    if language_is_de; then
+      log_info "Folgende missionskritische Variablen verwenden feste Standardwerte und werden nicht abgefragt:"
+    else
+      log_info "The following mission critical variables use fixed default values and are not prompted:"
+    fi
+
+    for critical_var in "${MISSION_CRITICAL_VARS[@]}"; do
+      local mission_default=""
+      mission_default="$(get_env_default "$critical_var")"
+      log_info "  ${critical_var}=${mission_default}"
+      ENV_VALUES["$critical_var"]="$mission_default"
+    done
+  fi
+
   for var in "${ENV_VARIABLES[@]}"; do
     local default_value=""
+
+    if is_mission_critical_var "$var"; then
+      default_value="$(get_env_default "$var")"
+      ENV_VALUES["$var"]="$default_value"
+      continue
+    fi
+
     if (( ! ignore_existing_defaults )) && [[ -v EXISTING_ENV_VALUES[$var] ]]; then
       default_value="${EXISTING_ENV_VALUES[$var]}"
     else

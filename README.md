@@ -102,6 +102,13 @@ Konfigurationsdateien überschreiben.
 > den Fehler `Invalid user name nbxyz` beim Start von `supervisord`. Passen Sie die IDs
 > bei Bedarf an die UID/GID Ihres Docker-Hosts an.
 
+> **Mission-Critical Defaults:** Interne Kommunikationsports wie `OPSI_API_PORT`,
+> `OPSI_DEPOT_PORT`, `PXE_TFTP_PORT` und `REDIS_SERVICE_PORT` folgen festen Standards
+> und werden vom Installer nicht mehr abgefragt. Sie werden automatisch mit ihren
+> Default-Werten in `docker/.env` geschrieben, damit zentrale Dienste zuverlässig
+> miteinander kommunizieren. Exponierte HTTP-Ports (z. B. für Web-UIs) bleiben
+> weiterhin konfigurierbar.
+
 Alle Dateien werden beim ersten Lauf des Installers aus den jeweiligen
 `.example`-Vorlagen kopiert und können anschließend editiert werden.
 
