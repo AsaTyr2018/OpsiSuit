@@ -40,6 +40,7 @@ ENV_VARIABLES=(
   AGENT_SECRET
   AGENT_POLL_INTERVAL
   PXE_HTTP_PORT
+  PXE_WEBAPP_PORT
   PXE_TFTP_PORT
   SERVICE_UID
   SERVICE_GID
@@ -127,11 +128,12 @@ get_env_default() {
     AGENT_SECRET) echo "ChangeMeAgentSecret!" ;;
     AGENT_POLL_INTERVAL) echo "3600" ;;
     PXE_HTTP_PORT) echo "8080" ;;
+    PXE_WEBAPP_PORT) echo "3000" ;;
     PXE_TFTP_PORT) echo "69" ;;
     SERVICE_UID) echo "0" ;;
     SERVICE_GID) echo "0" ;;
     TIMEZONE) echo "UTC" ;;
-    PXE_IMAGE) echo "ghcr.io/linuxserver/tftp:latest" ;;
+    PXE_IMAGE) echo "netbootxyz/netbootxyz:latest" ;;
     *) echo "" ;;
   esac
 }
@@ -204,6 +206,7 @@ build_prompt() {
       AGENT_SECRET) label="Agent-Secret für Client-Registrierung (Änderung empfohlen)" ;;
       AGENT_POLL_INTERVAL) label="Abfrageintervall des Agenten in Sekunden" ;;
       PXE_HTTP_PORT) label="HTTP-Port für PXE-Bereitstellung" ;;
+      PXE_WEBAPP_PORT) label="Webinterface-Port für netboot.xyz" ;;
       PXE_TFTP_PORT) label="UDP-Port für PXE/TFTP" ;;
       SERVICE_UID) label="UID für Container-Dienste" ;;
       SERVICE_GID) label="GID für Container-Dienste" ;;
@@ -238,6 +241,7 @@ build_prompt() {
       AGENT_SECRET) label="Agent secret for client registration (change recommended)" ;;
       AGENT_POLL_INTERVAL) label="Agent polling interval in seconds" ;;
       PXE_HTTP_PORT) label="HTTP port for PXE provisioning" ;;
+      PXE_WEBAPP_PORT) label="Web interface port for netboot.xyz" ;;
       PXE_TFTP_PORT) label="UDP port for PXE/TFTP" ;;
       SERVICE_UID) label="UID for container services" ;;
       SERVICE_GID) label="GID for container services" ;;
@@ -264,7 +268,7 @@ validate_env_value() {
   local numeric_value=0
 
   case "$var" in
-    DB_PORT|OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_WEBUI_PORT|PXE_HTTP_PORT|PXE_TFTP_PORT)
+    DB_PORT|OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_WEBUI_PORT|PXE_HTTP_PORT|PXE_WEBAPP_PORT|PXE_TFTP_PORT)
       if [[ ! "$value" =~ ^[0-9]+$ ]]; then
         warn_invalid_port
         return 1

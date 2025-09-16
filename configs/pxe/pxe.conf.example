@@ -1,10 +1,11 @@
 # Example dnsmasq PXE configuration snippet for OpsiSuit.
 # Copy to configs/pxe/pxe.conf and adapt addresses and filenames.
+# The netboot.xyz container serves boot files from /config/menus.
 
 port=0
 log-dhcp
 enable-tftp
-tftp-root=/tftpboot
+tftp-root=/config/menus
 
 dhcp-range=192.168.56.100,192.168.56.200,12h
 dhcp-option=3,192.168.56.1

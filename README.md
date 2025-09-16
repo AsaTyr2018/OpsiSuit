@@ -18,7 +18,7 @@ vereinfachen soll.
 |---------------|------------------------------------------------------------------------------|
 | `db`          | MariaDB 10.11 als zentrales Backend für OPSI.                                |
 | `opsi-server` | OPSI-Server inklusive Config-API und Depot. Greift auf DB und Konfigurationen zu. |
-| `pxe`         | TFTP-Service für PXE-Boot (Standard: `ghcr.io/linuxserver/tftp`).             |
+| `pxe`         | netboot.xyz TFTP/HTTP-Service mit Webinterface (Standard: `netbootxyz/netbootxyz`). |
 
 ## Repository-Struktur
 
