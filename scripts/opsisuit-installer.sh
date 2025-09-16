@@ -24,6 +24,8 @@ LANGUAGE=""
 declare -A EXISTING_ENV_VALUES=()
 declare -A ENV_VALUES=()
 GENERATED_AGENT_SECRET=""
+LEGACY_OPSICONFD_ARGS_VALUE=""
+SANITIZED_OPSICONFD_ARGS_VALUE=""
 
 ENV_VARIABLES=(
   DB_ROOT_PASSWORD
@@ -133,8 +135,160 @@ load_existing_env_values() {
     if [[ -z "$key" || "$key" == '#'* ]]; then
       continue
     fi
+
+    if [[ "$key" == "OPSICONFD_ARGS" ]]; then
+      local normalized
+      normalized="$(sanitize_opsiconfd_args_value "$value")"
+      if [[ "$normalized" != "$value" ]]; then
+        LEGACY_OPSICONFD_ARGS_VALUE="$value"
+        value="$normalized"
+      fi
+      SANITIZED_OPSICONFD_ARGS_VALUE="$value"
+    fi
     EXISTING_ENV_VALUES["$key"]="$value"
   done <"$ENV_FILE"
+
+  if [[ -n "$LEGACY_OPSICONFD_ARGS_VALUE" ]]; then
+    if language_is_de; then
+      log_warn "OPSICONFD_ARGS enthielt das veraltete '--ssl'-Flag und wurde auf '${SANITIZED_OPSICONFD_ARGS_VALUE}' normalisiert."
+    else
+      log_warn "Detected deprecated '--ssl' flag in OPSICONFD_ARGS; normalizing to '${SANITIZED_OPSICONFD_ARGS_VALUE}'."
+    fi
+  fi
+}
+
+sanitize_opsiconfd_args_value() {
+  local raw_value="$1"
+  local stripped_value="${raw_value%$'\r'}"
+  local quote_char=""
+
+  if (( ${#stripped_value} >= 2 )); then
+    local first_char="${stripped_value:0:1}"
+    local last_char="${stripped_value: -1}"
+    if [[ "$first_char" == "\"" && "$last_char" == "\"" ]]; then
+      quote_char='"'
+      stripped_value="${stripped_value:1:${#stripped_value}-2}"
+    elif [[ "$first_char" == "'" && "$last_char" == "'" ]]; then
+      quote_char="'"
+      stripped_value="${stripped_value:1:${#stripped_value}-2}"
+    fi
+  fi
+
+  read -ra tokens <<<"$stripped_value"
+
+  declare -a cleaned_tokens=()
+  local has_config_file=0
+
+  for ((i = 0; i < ${#tokens[@]}; i++)); do
+    local token="${tokens[i]}"
+
+    case "$token" in
+      --ssl)
+        if (( i + 1 < ${#tokens[@]} )); then
+          local next_token="${tokens[i + 1]}"
+          if [[ "$next_token" != --* ]]; then
+            ((i++))
+          fi
+        fi
+        continue
+        ;;
+      --ssl=*|--no-ssl|--disable-ssl|--enable-ssl)
+        continue
+        ;;
+    esac
+
+    case "$token" in
+      --config-file)
+        has_config_file=1
+        cleaned_tokens+=("$token")
+        if (( i + 1 < ${#tokens[@]} )); then
+          ((i++))
+          cleaned_tokens+=("${tokens[i]}")
+        fi
+        ;;
+      --config-file=*)
+        has_config_file=1
+        cleaned_tokens+=("$token")
+        ;;
+      "")
+        ;;
+      *)
+        cleaned_tokens+=("$token")
+        ;;
+    esac
+  done
+
+  local sanitized=""
+  for token in "${cleaned_tokens[@]}"; do
+    [[ -z "$token" ]] && continue
+    if [[ -n "$sanitized" ]]; then
+      sanitized+=" "
+    fi
+    sanitized+="$token"
+  done
+
+  if (( ! has_config_file )); then
+    if [[ -n "$sanitized" ]]; then
+      sanitized+=" "
+    fi
+    sanitized+="--config-file=/etc/opsi/opsiconfd.conf"
+  fi
+
+  if [[ -n "$quote_char" ]]; then
+    printf '%s%s%s' "$quote_char" "$sanitized" "$quote_char"
+  else
+    printf '%s' "$sanitized"
+  fi
+}
+
+maybe_patch_legacy_opsiconfd_args() {
+  if [[ -z "$LEGACY_OPSICONFD_ARGS_VALUE" ]]; then
+    return
+  fi
+
+  local new_value="$SANITIZED_OPSICONFD_ARGS_VALUE"
+  if [[ -z "$new_value" ]]; then
+    new_value="--config-file=/etc/opsi/opsiconfd.conf"
+  fi
+
+  if (( DRY_RUN )); then
+    if language_is_de; then
+      log_info "[dry-run] Würde OPSICONFD_ARGS in ${ENV_FILE} von '${LEGACY_OPSICONFD_ARGS_VALUE}' auf '${new_value}' aktualisieren."
+    else
+      log_info "[dry-run] Would update OPSICONFD_ARGS in ${ENV_FILE} from '${LEGACY_OPSICONFD_ARGS_VALUE}' to '${new_value}'."
+    fi
+    return
+  fi
+
+  if [[ ! -f "$ENV_FILE" ]]; then
+    return
+  fi
+
+  local tmp_file
+  tmp_file="$(mktemp "${ENV_FILE}.XXXX")"
+  local replaced=0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ $line =~ ^([[:space:]]*OPSICONFD_ARGS[[:space:]]*=[[:space:]]*)(.*)$ ]]; then
+      printf '%s%s\n' "${BASH_REMATCH[1]}" "$new_value" >>"$tmp_file"
+      replaced=1
+    else
+      printf '%s\n' "$line" >>"$tmp_file"
+    fi
+  done <"$ENV_FILE"
+
+  if (( replaced )); then
+    local backup="${ENV_FILE}.bak.sslfix.$(date +%Y%m%d%H%M%S)"
+    cp "$ENV_FILE" "$backup"
+    mv "$tmp_file" "$ENV_FILE"
+    if language_is_de; then
+      log_info "OPSICONFD_ARGS in ${ENV_FILE} wurde aktualisiert (Sicherung: $backup)."
+    else
+      log_info "Updated OPSICONFD_ARGS in ${ENV_FILE} (backup: $backup)."
+    fi
+  else
+    rm -f "$tmp_file"
+  fi
 }
 
 get_env_default() {
@@ -658,6 +812,7 @@ ensure_env_file() {
   fi
 
   if (( reuse_existing_env )); then
+    maybe_patch_legacy_opsiconfd_args
     if language_is_de; then
       log_info "Bestehende docker/.env wird verwendet."
     else
