@@ -32,6 +32,7 @@ ENV_VARIABLES=(
   DB_PORT
   REDIS_IMAGE
   REDIS_PORT
+  REDIS_SERVICE_PORT
   OPSI_ADMIN_USER
   OPSI_ADMIN_PASSWORD
   OPSI_SERVER_FQDN
@@ -122,6 +123,7 @@ get_env_default() {
     DB_PORT) echo "3306" ;;
     REDIS_IMAGE) echo "redis:7-alpine" ;;
     REDIS_PORT) echo "6379" ;;
+    REDIS_SERVICE_PORT) echo "6379" ;;
     OPSI_ADMIN_USER) echo "opsiadmin" ;;
     OPSI_ADMIN_PASSWORD) echo "" ;;
     OPSI_SERVER_FQDN) echo "opsi.local" ;;
@@ -201,7 +203,8 @@ build_prompt() {
       DB_PASSWORD) label="Passwort für den Datenbankbenutzer" ;;
       DB_PORT) label="Datenbank-Portnummer" ;;
       REDIS_IMAGE) label="Container-Image für Redis" ;;
-      REDIS_PORT) label="Redis-Portnummer" ;;
+      REDIS_PORT) label="Externer Redis-Port (Host)" ;;
+      REDIS_SERVICE_PORT) label="Interner Redis-Port (Container)" ;;
       OPSI_ADMIN_USER) label="OPSI-Administratorbenutzer" ;;
       OPSI_ADMIN_PASSWORD) label="Passwort für den OPSI-Administrator" ;;
       OPSI_SERVER_FQDN) label="FQDN des OPSI-Servers" ;;
@@ -238,7 +241,8 @@ build_prompt() {
       DB_PASSWORD) label="Password for the database user" ;;
       DB_PORT) label="Database port number" ;;
       REDIS_IMAGE) label="Container image for Redis" ;;
-      REDIS_PORT) label="Redis port number" ;;
+      REDIS_PORT) label="Redis host port" ;;
+      REDIS_SERVICE_PORT) label="Redis service port (inside container network)" ;;
       OPSI_ADMIN_USER) label="OPSI administrator user" ;;
       OPSI_ADMIN_PASSWORD) label="Password for the OPSI administrator" ;;
       OPSI_SERVER_FQDN) label="Fully qualified domain name of the OPSI server" ;;
@@ -276,7 +280,7 @@ validate_env_value() {
   local numeric_value=0
 
   case "$var" in
-    DB_PORT|REDIS_PORT|OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_WEBUI_PORT|PXE_HTTP_PORT|PXE_WEBAPP_PORT|PXE_TFTP_PORT)
+    DB_PORT|REDIS_PORT|REDIS_SERVICE_PORT|OPSI_API_PORT|OPSI_DEPOT_PORT|OPSI_WEBUI_PORT|PXE_HTTP_PORT|PXE_WEBAPP_PORT|PXE_TFTP_PORT)
       if [[ ! "$value" =~ ^[0-9]+$ ]]; then
         warn_invalid_port
         return 1
