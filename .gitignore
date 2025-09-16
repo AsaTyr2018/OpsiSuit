@@ -1,0 +1,25 @@
+# Environment files
+/docker/.env
+/docker/.env.local
+
+# Generated configuration files
+configs/**/*.conf
+!configs/**/*.conf.example
+configs/**/*.cfg
+!configs/**/*.cfg.example
+configs/**/*.ini
+!configs/**/*.ini.example
+configs/**/*.yaml
+!configs/**/*.yaml.example
+configs/**/*.yml
+!configs/**/*.yml.example
+
+# Persistent runtime directories
+/data/
+/logs/
+/backups/
+/tmp/
+
+# Editor and OS files
+.DS_Store
+*.swp
