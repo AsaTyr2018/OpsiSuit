@@ -76,10 +76,7 @@ services:
       AGENT_SECRET: ${AGENT_SECRET:-ChangeMeAgentSecret!}
       AGENT_POLL_INTERVAL: ${AGENT_POLL_INTERVAL:-3600}
     volumes:
-      - ../data/opsi:/var/lib/opsi
-      - ../configs/opsi:/etc/opsi/conf.d
-      - ../configs/agent:/etc/opsi/agent.d
-      - ../logs/opsi-server:/var/log/opsi
+      - ../data/opsi:/data
     ports:
       - "${OPSI_API_PORT:-4447}:4447"
       - "${OPSI_DEPOT_PORT:-4441}:4441"

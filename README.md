@@ -93,9 +93,20 @@ Konfigurationsdateien überschreiben.
 
 1. `docker/.env` – zentrale Variablen für den Compose-Stack
    (Ports, Passwörter, Image-Tags, Secrets).
-2. `configs/opsi/opsi.conf` – globale OPSI-Einstellungen.
+2. `configs/opsi/opsi.conf` – Beispiel-Fragment für globale OPSI-Einstellungen
+   (bei Bedarf nach `data/opsi/etc/conf.d/` kopieren).
 3. `configs/pxe/pxe.conf` – Beispielkonfiguration für dnsmasq/TFTP.
-4. `configs/agent/client-agent.conf` – Vorgaben für den OPSI-Client-Agenten.
+4. `configs/agent/client-agent.conf` – Vorlage für den OPSI-Client-Agenten
+   (nach `data/opsi/etc/agent.d/` kopieren).
+
+> **Persistente Datenablage:** Der OPSI-Server verschiebt beim Start seine
+> Verzeichnisse `/etc/opsi`, `/var/lib/opsi`, `/var/log/opsi` sowie
+> `/var/lib/opsiconfd` nach `/data` im Container. Dieses komplette Datenverzeichnis
+> ist auf dem Host unter `data/opsi/` zu finden. Logs liegen somit unter
+> `data/opsi/log/`. Die Ordner `configs/opsi/` und `configs/agent/` enthalten
+> weiterhin Beispiel-Fragmente, die bei Bedarf nach `data/opsi/etc/conf.d/` bzw.
+> `data/opsi/etc/agent.d/` kopiert werden können, um eigene Einstellungen
+> einzuspielen.
 
 > **Hinweis:** Für den PXE-Container (`netboot.xyz`) muss `SERVICE_UID`/`SERVICE_GID`
 > auf eine reguläre Benutzer-/Gruppen-ID zeigen. Die Standardwerte (`1000`) vermeiden
