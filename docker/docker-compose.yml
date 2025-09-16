@@ -51,6 +51,7 @@ services:
   opsi-server:
     image: ${OPSI_SERVER_IMAGE:-uibmz/opsi-server:4.2}
     container_name: opsisuit-server
+    hostname: ${OPSI_SERVER_FQDN:-opsi.local}
     restart: unless-stopped
     depends_on:
       redis:

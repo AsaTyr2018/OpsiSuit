@@ -112,6 +112,11 @@ Konfigurationsdateien überschreiben.
 > `redis://redis:${REDIS_SERVICE_PORT:-6379}/0` gesetzt und wird nicht mehr über
 > `.env` überschrieben.
 
+> **FQDN erforderlich:** Der OPSI-Server-Container übernimmt den in `.env`
+> definierten `OPSI_SERVER_FQDN` direkt als Hostnamen. Verwenden Sie deshalb immer
+> einen vollqualifizierten Domainnamen (z. B. `opsi.example.local`). Andernfalls
+> verweigert `opsiconfd` den Start mit `ValueError: Bad fqdn`.
+
 Alle Dateien werden beim ersten Lauf des Installers aus den jeweiligen
 `.example`-Vorlagen kopiert und können anschließend editiert werden.
 
