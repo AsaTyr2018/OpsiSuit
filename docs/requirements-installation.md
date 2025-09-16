@@ -1,14 +1,13 @@
-# Schnellinstallation der Voraussetzungen
+# Quick Installation of Prerequisites
 
-Die folgenden Kurz-Anleitungen zeigen, wie sich die in der README genannten
-Pakete (`docker`, `docker compose`, `curl`, `git`) auf gängigen Distributionen
-installieren lassen. Alle Beispiele setzen `sudo`-Rechte voraus.
+The following quick guides show how to install the packages listed in the README
+(`docker`, `docker compose`, `curl`, `git`) on common distributions. All examples
+assume `sudo` privileges.
 
-> **Hinweis:** Nach dem Hinzufügen zur `docker`-Gruppe ist eine neue
-> Terminal-Sitzung (oder Ab- und Anmeldung) erforderlich, damit die
-> Berechtigungen greifen.
+> **Note:** After adding yourself to the `docker` group you need a new terminal
+> session (or log out and back in) so that the permissions take effect.
 
-## Debian / Ubuntu / Derivate
+## Debian / Ubuntu / Derivatives
 
 ```bash
 sudo apt update
@@ -44,7 +43,7 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"
 ```
 
-## Installation prüfen
+## Verify the Installation
 
 ```bash
 docker --version
@@ -53,4 +52,4 @@ curl --version
 git --version
 ```
 
-Wenn alle Befehle eine Versionsnummer ausgeben, sind die Voraussetzungen erfüllt.
+If all commands print a version number, the prerequisites are satisfied.

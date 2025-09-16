@@ -1,116 +1,115 @@
 # Agent: OpsiSuit
 
-## Überblick
+## Overview
 
-**Name:** OpsiSuit  
-**Zweck:** Automatisierte Einrichtung und Verwaltung einer vollständigen OPSI‑Infrastructure (OS‑Deployment, Applikationsdeployment, Inventarisierung).  
-**Zielplattform:** Linux‑Server (am besten Debian / Ubuntu / CentOS / RHEL etc.), möglichst unter Docker oder mittels Containerisierung.  
+**Name:** OpsiSuit
+**Purpose:** Automated setup and management of a complete OPSI infrastructure (OS deployment, application deployment, inventory).
+**Target platform:** Linux servers (preferably Debian / Ubuntu / CentOS / RHEL etc.), ideally under Docker or using containerization.
 
-OpsiSuit übernimmt:
+OpsiSuit handles:
 
-- Installation und Konfiguration des Opsi‑Servers und aller zugehörigen Komponenten  
-- Einrichtung von Opsi‑Clients / Agenten auf Zielrechnern  
-- Verwaltung von App‑Deployments  
-- OS‑Deployment (Installation, Imaging, Partitionierung etc.)  
-- Inventarisierung: Hardware, Software, Konfiguration  
-
----
-
-## Komponenten & Architektur
-
-| Komponente | Beschreibung |
-|------------|--------------|
-| **Opsi Server** | Zentrale Komponente, steuert Deployment, Inventarisierung, Clients. |
-| **Database** | z. B. MariaDB / MySQL / PostgreSQL zur Speicherung von Opsi‑Daten. |
-| **Web Frontend / Management UI** | Weboberfläche zur Verwaltung von Images, Paketen, Clients etc. |
-| **Tftp / PXE + Netboot Komponenten** | Für OS‑Deployment über Netzwerk, Boot images etc. |
-| **Package Repo / Paketmanagement** | Stores für Softwarepakete, Updates etc. |
-| **Client‑Agent** | Wird auf Zielmaschinen installiert, führt Deployment, Inventarisierung etc. aus. |
-| **Inventarisierung Modul** | Script / Agent, der Hardware‑ & Softwaredaten sammelt und zurückmeldet. |
-
-Wenn möglich, alles in Containern betrieben, mit klarer Trennung z. B. Datenbank, Webfrontend, PXE/TFTP, Agent etc.  
+- Installation and configuration of the OPSI server and all related components
+- Provisioning of OPSI clients / agents on target machines
+- Management of application deployments
+- OS deployment (installation, imaging, partitioning, etc.)
+- Inventory: hardware, software, configuration
 
 ---
 
-## Installations‑ und Setupablauf
+## Components & Architecture
 
-1. **Servervorbereitung**  
-   - Linux‑Server mit minimaler Installation  
-   - Basis‑Pakete: Docker / Docker‑Compose (oder Podman), Git, Curl, ggf. Firewall / Netzkonfiguration  
-   - Netzwerk vorbereiten (z. B. DHCP + PXE, statische IP etc.), DNS falls benötigt  
+| Component | Description |
+|-----------|-------------|
+| **OPSI Server** | Central component that controls deployment, inventory, and clients. |
+| **Database** | e.g., MariaDB / MySQL / PostgreSQL for storing OPSI data. |
+| **Web Frontend / Management UI** | Web interface for managing images, packages, clients, etc. |
+| **Tftp / PXE + Netboot Components** | For OS deployment over the network, boot images, etc. |
+| **Package Repository / Package Management** | Stores for software packages, updates, etc. |
+| **Client Agent** | Installed on target machines to execute deployment, inventory, etc. |
+| **Inventory Module** | Script / agent that collects hardware and software data and reports back. |
 
-2. **Containerisierte Komponenten (falls Docker verwendet wird)**  
-   - Definieren von Docker‑Compose / Stack: Services für Opsi Backend, Datenbank, Web Frontend, PXE/TFTP, ggf. Proxy/Load Balancer  
-   - Persistente Volumes konfigurieren (z. B. DB Daten, Logs, Images)  
-   - Netzwerke und Ports (z. B. HTTP/HTTPS, TFTP, DHCP etc.)  
-
-3. **OPSI Server Installation & Konfiguration**  
-   - OPSI Paketquelle hinzufügen  
-   - Installation der OPSI Server Komponenten  
-   - Einrichtung Datenbank (Schema, Nutzer, Berechtigungen)  
-   - Web UI konfigurieren, SSL (z. B. mittels Let’s Encrypt)  
-
-4. **PXE / Netboot Setup**  
-   - TFTP / DHCP-Konfiguration (sofern nicht bereits vorhanden)  
-   - Netboot‑Images vorbereiten  
-   - Boot‑Konfiguration (z. B. Linux Kernel + Initrd)  
-
-5. **Client Agent Setup**  
-   - Automatisches Ausrollen des Agenten auf Zielrechner (z. B. via SSH, via OPSI selbst)  
-   - Sicherstellung, dass Inventarisierungs‑Modul läuft und regelmäßig Daten an Server sendet  
-
-6. **App‑ und OS Deployment Setup**  
-   - Definition von OS Images (Konfiguration, Partitionierung, Treiber etc.)  
-   - App Paket‑Repos (Windows / Linux Applikationen)  
-   - Deployment Scripts / Tasks definieren  
-   - Rollout / Update Management  
-
-7. **Inventarisierung**  
-   - Erfassen von Hardwaredaten (CPU, RAM, Festplatten, Netzwerkkarten etc.)  
-   - Erfassen von installierter Software & Versionen  
-   - Logik zur Erkennung von Abweichungen / fehlenden Updates  
-
-8. **Monitoring & Backup**  
-   - Logsammlung, Monitoring der Dienste (z. B. via Prometheus, Grafana oder simpler Überwachung)  
-   - Backup der Datenbank, der Konfiguration, der Images  
+If possible, run everything in containers with a clear separation, e.g., database, web frontend, PXE/TFTP, agent, etc.
 
 ---
 
-## Stilrichtlinien & Best Practices für den Agenten
+## Installation and Setup Flow
 
-- **Idempotenz:** Aktionen mehrfach ausgeführt erzeugen keinen Fehlerzustand.  
-- **Konfigurierbarkeit:** Möglichst viele Parameter extern (z. .ENV, YAML, etc.) einstellbar: Ports, Pfade, Datenbank‑Credentials, Netzwerk etc.  
-- **Modularität:** Jeder Teil (DB, Web UI, PXE, Agent, Inventarisierung) möglichst isoliert, austauschbar.  
-- **Sicherheit:**  
-  - SSL/TLS für Webinterfaces  
-  - sichere Credentials, ggf. Secrets Management  
-  - eingeschränkter Zugang zu PXE/TFTP etc.  
-- **Logging & Fehlerbehandlung:** Klare Logs, verständliche Fehlermeldungen, Recovery‑Pfade.  
-- **Dokumentation & Testing:** Jede Komponente sollte dokumentiert sein (Setup, Nutzung), automatische Tests / Validierungen sofern möglich.  
+1. **Server preparation**
+   - Linux server with a minimal installation
+   - Base packages: Docker / Docker Compose (or Podman), Git, Curl, possibly firewall / network configuration
+   - Prepare the network (e.g., DHCP + PXE, static IP, DNS if required)
+
+2. **Containerized components (if Docker is used)**
+   - Define Docker Compose / stack: services for OPSI backend, database, web frontend, PXE/TFTP, optionally proxy/load balancer
+   - Configure persistent volumes (e.g., database data, logs, images)
+   - Networks and ports (e.g., HTTP/HTTPS, TFTP, DHCP, etc.)
+
+3. **OPSI server installation & configuration**
+   - Add OPSI package source
+   - Install the OPSI server components
+   - Set up the database (schema, user, permissions)
+   - Configure the web UI, SSL (e.g., using Let's Encrypt)
+
+4. **PXE / Netboot setup**
+   - Configure TFTP / DHCP (if not already available)
+   - Prepare netboot images
+   - Boot configuration (e.g., Linux kernel + initrd)
+
+5. **Client agent setup**
+   - Automatically roll out the agent to target machines (e.g., via SSH, via OPSI itself)
+   - Ensure that the inventory module runs and regularly sends data back to the server
+
+6. **App and OS deployment setup**
+   - Define OS images (configuration, partitioning, drivers, etc.)
+   - Application package repositories (Windows / Linux applications)
+   - Define deployment scripts / tasks
+   - Rollout / update management
+
+7. **Inventory**
+   - Collect hardware data (CPU, RAM, disks, network cards, etc.)
+   - Collect installed software and versions
+   - Logic to detect deviations / missing updates
+
+8. **Monitoring & Backup**
+   - Collect logs, monitor services (e.g., via Prometheus, Grafana or simple monitoring)
+   - Back up the database, configuration, and images
 
 ---
 
-## Technische Hinweise & Defaults
+## Style Guidelines & Best Practices for the Agent
 
-- **Betriebssysteme (Server):** Debian 12 / Ubuntu LTS / CentOS / RockyLinux  
-- **Datenbank:** MariaDB oder PostgreSQL, Standby oder Replikation optional  
-- **Container Orchestrierung:** Docker + Docker‑Compose, optional Kubernetes in großen Setups  
-- **Web UI:** Vorzugsweise der standardmäßige Opsi Webinstaller / Opsi ConfigAPI, ggf. eigenes Dashboard  
-- **Netzwerkdienste:**  
-  - DHCP Server oder Interaktion mit existierendem DHCP  
-  - PXE/TFTP über UDP Port 69 + entsprechende Ports  
-  - HTTP/HTTPS für Datei‑ und Paketbereitstellung  
-- **Agenten:** Unterstützt Windows und Linux Clients  
-- **Inventarisierungstakt:** z. B. tägliches Inventar, bei großen Umgebungen ggf. stündlich oder nach Bedarf  
+- **Idempotence:** Running actions multiple times must not create an error state.
+- **Configurability:** As many parameters as possible should be configurable externally (e.g., .ENV, YAML, etc.): ports, paths, database credentials, network, etc.
+- **Modularity:** Each part (database, web UI, PXE, agent, inventory) should be as isolated and interchangeable as possible.
+- **Security:**
+  - SSL/TLS for web interfaces
+  - Secure credentials, ideally secrets management
+  - Restricted access to PXE/TFTP, etc.
+- **Logging & error handling:** Clear logs, understandable error messages, recovery paths.
+- **Documentation & testing:** Each component should be documented (setup, usage) with automated tests / validations where possible.
 
 ---
 
-## Vorschlag für Ordnerstruktur / Repository
+## Technical Notes & Defaults
 
-Eine mögliche Struktur in einem Git‑Repository:
+- **Operating systems (server):** Debian 12 / Ubuntu LTS / CentOS / Rocky Linux
+- **Database:** MariaDB or PostgreSQL, standby or replication optional
+- **Container orchestration:** Docker + Docker Compose, optionally Kubernetes for large setups
+- **Web UI:** Preferably the standard OPSI web installer / OPSI ConfigAPI, optionally a custom dashboard
+- **Network services:**
+  - DHCP server or integration with an existing DHCP service
+  - PXE/TFTP over UDP port 69 + corresponding ports
+  - HTTP/HTTPS for file and package delivery
+- **Agents:** Support Windows and Linux clients
+- **Inventory interval:** e.g., daily inventory; for large environments possibly hourly or as required
+
+---
+
+## Suggested Folder Structure / Repository Layout
+
+A possible structure for a Git repository:
 
 ```
-
 opsisuit/
 ├── docker/
 │   ├── docker-compose.yml
@@ -124,34 +123,34 @@ opsisuit/
 ├── configs/
 │   ├── opsi.conf
 │   ├── pxe/
-│   └── client\_agent.conf
+│   └── client_agent.conf
 ├── scripts/
-│   ├── setup\_server.sh
-│   ├── setup\_agent.sh
-│   └── inventory\_collector.sh
+│   ├── setup_server.sh
+│   ├── setup_agent.sh
+│   └── inventory_collector.sh
 ├── images/
-│   └── os\_templates/
+│   └── os_templates/
 ├── docs/
 │   ├── installation.md
 │   ├── usage.md
 │   └── troubleshooting.md
 └── tests/
-├── ci\_tests/
-└── integration\_tests/
+├── ci_tests/
+└── integration_tests/
 
 ````
 
 ---
 
-## Schnittstellen & API
+## Interfaces & API
 
-- **ConfigAPI** von Opsi nutzen für automatisierte Steuerung (Pakete, Clients, Aufgaben).  
-- REST‑API endpoint im Agenten, um Inventarisierungsdaten zu liefern.  
-- Falls nötig Webhooks oder Events für Statusänderungen oder Fehler.  
+- Use the OPSI ConfigAPI for automated control (packages, clients, tasks).
+- REST API endpoint in the agent to submit inventory data.
+- Webhooks or events for status changes or errors if required.
 
 ---
 
-## Beispiel Konfigurationsvariablen (ENV / YAML)
+## Example Configuration Variables (ENV / YAML)
 
 ```yaml
 server:
@@ -183,20 +182,19 @@ webui:
 
 ---
 
-## Aufgaben / User Stories
+## Tasks / User Stories
 
-Damit der Agent aussagekräftig entwickelt werden kann, ein paar User Stories:
+To guide the development of the agent, a few user stories:
 
-* Als Administrator möchte ich mit einem einzigen Kommando den kompletten OPSI‑Server im Docker‑Setup aufsetzen.
-* Als Administrator will ich neue Clients automatisch inventarisieren können, sobald sie im Netzwerk sind.
-* Als Administrator möchte ich OS Images definieren und auf neue Maschinen deployen können.
-* Als Administrator will ich Applikationen auf Clients ausrollen und Updates steuern können.
-* Als Administrator möchte ich Zugriff auf Logs / Status‑Views über eine Web UI haben.
+* As an administrator I want to set up the entire OPSI server in a Docker setup with a single command.
+* As an administrator I want new clients to be inventoried automatically as soon as they appear on the network.
+* As an administrator I want to define OS images and deploy them to new machines.
+* As an administrator I want to roll out applications to clients and control updates.
+* As an administrator I want access to logs / status views through a web UI.
 
 ---
 
-## Zusammenfassung
+## Summary
 
-OpsiSuit soll eine **vollständige, modulare, automatisierte Lösung** sein, mit der man schnell eine OPSI‑Infrastruktur auf Linux (ideal Docker) aufsetzen kann, OS & App Deployment steuern sowie Inventarisierung betreiben. Sicherheit, Konfigurierbarkeit und Wartbarkeit sind Kernelemente.
-
+OpsiSuit aims to be a **complete, modular, automated solution** that allows you to quickly set up an OPSI infrastructure on Linux (ideally Docker), manage OS & app deployments, and handle inventory. Security, configurability, and maintainability are core elements.
 
