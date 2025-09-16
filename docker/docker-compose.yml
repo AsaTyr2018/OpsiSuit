@@ -73,6 +73,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       REDIS_HOST: redis
       OPSICONFD_REDIS_URL: redis://redis:${REDIS_SERVICE_PORT:-6379}/0
+      OPSICONFD_ARGS: ${OPSICONFD_ARGS:-"--config-file=/etc/opsi/opsiconfd.conf"}
       AGENT_SECRET: ${AGENT_SECRET:-ChangeMeAgentSecret!}
       AGENT_POLL_INTERVAL: ${AGENT_POLL_INTERVAL:-3600}
     volumes:
