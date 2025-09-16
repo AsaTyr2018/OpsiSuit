@@ -1007,6 +1007,8 @@ ensure_directories() {
     "$DATA_DIR/db"
     "$DATA_DIR/opsi"
     "$DATA_DIR/opsi/etc"
+    "$DATA_DIR/opsi/etc/opsi"
+    "$DATA_DIR/opsi/etc/opsi/ssl"
     "$DATA_DIR/opsi/lib"
     "$DATA_DIR/opsi/log"
     "$DATA_DIR/opsi/opsiconfd"
@@ -1051,11 +1053,30 @@ copy_template() {
 
 render_opsiconfd_conf() {
   local template="$CONFIG_DIR/opsi/opsiconfd.conf.example"
-  local destination="$DATA_DIR/opsi/etc/opsiconfd.conf"
+  local destination="$DATA_DIR/opsi/etc/opsi/opsiconfd.conf"
+  local legacy_destination="$DATA_DIR/opsi/etc/opsiconfd.conf"
 
   if [[ ! -f "$template" ]]; then
     log_warn "Template $template is missing; skipping opsiconfd configuration"
     return
+  fi
+
+  if [[ -f "$legacy_destination" && ! -f "$destination" ]]; then
+    if (( DRY_RUN )); then
+      if language_is_de; then
+        log_info "[dry-run] Würde bestehende Datei ${legacy_destination} nach ${destination} verschieben."
+      else
+        log_info "[dry-run] Would migrate existing ${legacy_destination} to ${destination}."
+      fi
+    else
+      ensure_directory "$(dirname "$destination")"
+      mv "$legacy_destination" "$destination"
+      if language_is_de; then
+        log_info "Bestehende opsiconfd.conf nach ${destination} verschoben."
+      else
+        log_info "Migrated legacy opsiconfd.conf to ${destination}."
+      fi
+    fi
   fi
 
   if [[ -f "$destination" && $FORCE_CONFIG -eq 0 ]]; then
@@ -1068,20 +1089,143 @@ render_opsiconfd_conf() {
     return
   fi
 
-  local api_port depot_port tmp_file
-  api_port="$(get_effective_env_value OPSI_API_PORT)"
-  depot_port="$(get_effective_env_value OPSI_DEPOT_PORT)"
+  local api_port depot_port ssl_cert_path ssl_key_path ssl_ca_path tmp_file
+  api_port="4447"
+  depot_port="4441"
+  ssl_cert_path="/etc/opsi/ssl/opsiconfd-cert.pem"
+  ssl_key_path="/etc/opsi/ssl/opsiconfd-key.pem"
+  ssl_ca_path="/etc/opsi/ssl/opsiconfd-ca.pem"
+
+  ensure_directory "$(dirname "$destination")"
 
   tmp_file="$(mktemp "${destination}.XXXX")"
 
   while IFS= read -r line; do
-    line=${line//@OPSI_API_PORT@/$api_port}
-    line=${line//@OPSI_DEPOT_PORT@/$depot_port}
+    line=${line//@OPSI_API_INTERNAL_PORT@/$api_port}
+    line=${line//@OPSI_DEPOT_INTERNAL_PORT@/$depot_port}
+    line=${line//@OPSI_SSL_CERT_PATH@/$ssl_cert_path}
+    line=${line//@OPSI_SSL_KEY_PATH@/$ssl_key_path}
+    line=${line//@OPSI_SSL_CA_PATH@/$ssl_ca_path}
     printf '%s\n' "$line"
   done <"$template" >"$tmp_file"
 
   mv "$tmp_file" "$destination"
   log_info "Rendered $destination from template"
+}
+
+ensure_opsiconfd_ssl_assets() {
+  local ssl_dir="$DATA_DIR/opsi/etc/opsi/ssl"
+  local key_file="$ssl_dir/opsiconfd-key.pem"
+  local cert_file="$ssl_dir/opsiconfd-cert.pem"
+  local bundle_file="$ssl_dir/opsiconfd.pem"
+  local ca_file="$ssl_dir/opsiconfd-ca.pem"
+  local fqdn="$(get_effective_env_value OPSI_SERVER_FQDN)"
+  local regenerate=0
+
+  ensure_directory "$ssl_dir"
+
+  if [[ -z "$fqdn" ]]; then
+    fqdn="opsi.local"
+  fi
+
+  if [[ -f "$key_file" && -f "$cert_file" ]]; then
+    if (( FORCE_CONFIG )); then
+      regenerate=1
+    else
+      if language_is_de; then
+        log_info "Vorhandene TLS-Schlüssel/Zertifikate für opsiconfd werden weiterverwendet."
+      else
+        log_info "Existing opsiconfd TLS key/certificate detected; reusing them."
+      fi
+      return
+    fi
+  else
+    regenerate=1
+  fi
+
+  if (( ! regenerate )); then
+    return
+  fi
+
+  if (( DRY_RUN )); then
+    if language_is_de; then
+      log_info "[dry-run] Würde selbstsigniertes TLS-Zertifikat für ${fqdn} in ${ssl_dir} erzeugen."
+    else
+      log_info "[dry-run] Would generate a self-signed TLS certificate for ${fqdn} inside ${ssl_dir}."
+    fi
+    return
+  fi
+
+  local timestamp backup_dir
+  if [[ -f "$key_file" || -f "$cert_file" || -f "$bundle_file" || -f "$ca_file" ]]; then
+    backup_dir="$BACKUP_DIR/ssl"
+    ensure_directory "$backup_dir"
+    timestamp="$(date +%Y%m%d%H%M%S)"
+    [[ -f "$key_file" ]] && cp "$key_file" "$backup_dir/opsiconfd-key.pem.$timestamp"
+    [[ -f "$cert_file" ]] && cp "$cert_file" "$backup_dir/opsiconfd-cert.pem.$timestamp"
+    [[ -f "$bundle_file" ]] && cp "$bundle_file" "$backup_dir/opsiconfd.pem.$timestamp"
+    [[ -f "$ca_file" ]] && cp "$ca_file" "$backup_dir/opsiconfd-ca.pem.$timestamp"
+    if language_is_de; then
+      log_info "Bestehende TLS-Dateien nach ${backup_dir} gesichert (Zeitstempel ${timestamp})."
+    else
+      log_info "Backed up existing TLS assets to ${backup_dir} (timestamp ${timestamp})."
+    fi
+  fi
+
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+
+  local openssl_config="$tmpdir/opsiconfd.cnf"
+  local short_name="${fqdn%%.*}"
+  local -a dns_sans=("$fqdn")
+
+  if [[ -n "$short_name" && "$short_name" != "$fqdn" ]]; then
+    dns_sans+=("$short_name")
+  fi
+  dns_sans+=("localhost")
+
+  {
+    printf '[req]\n'
+    printf 'default_bits = 4096\n'
+    printf 'prompt = no\n'
+    printf 'default_md = sha256\n'
+    printf 'req_extensions = req_ext\n'
+    printf 'distinguished_name = dn\n'
+    printf '\n[dn]\n'
+    printf 'CN = %s\n' "$fqdn"
+    printf '\n[req_ext]\n'
+    printf 'subjectAltName = @alt_names\n'
+    printf '\n[alt_names]\n'
+    local idx=1
+    local san
+    for san in "${dns_sans[@]}"; do
+      printf 'DNS.%d = %s\n' "$idx" "$san"
+      ((idx++))
+    done
+    printf 'IP.1 = 127.0.0.1\n'
+    printf 'IP.2 = ::1\n'
+  } >"$openssl_config"
+
+  openssl req -x509 -new -nodes -newkey rsa:4096 \
+    -days 825 \
+    -keyout "$tmpdir/opsiconfd-key.pem" \
+    -out "$tmpdir/opsiconfd-cert.pem" \
+    -config "$openssl_config" \
+    -extensions req_ext >/dev/null
+
+  install -m 600 "$tmpdir/opsiconfd-key.pem" "$key_file"
+  install -m 644 "$tmpdir/opsiconfd-cert.pem" "$cert_file"
+  cat "$tmpdir/opsiconfd-key.pem" "$tmpdir/opsiconfd-cert.pem" >"$tmpdir/opsiconfd.pem"
+  install -m 600 "$tmpdir/opsiconfd.pem" "$bundle_file"
+  install -m 644 "$tmpdir/opsiconfd-cert.pem" "$ca_file"
+
+  rm -rf "$tmpdir"
+
+  if language_is_de; then
+    log_info "Selbstsigniertes Zertifikat für ${fqdn} erzeugt."
+  else
+    log_info "Generated self-signed TLS certificate for ${fqdn}."
+  fi
 }
 
 ensure_config_templates() {
@@ -1393,6 +1537,7 @@ ensure_dependencies() {
 
   ensure_command curl
   ensure_command git
+  ensure_command openssl
   ensure_docker
   ensure_docker_compose
 
@@ -1453,6 +1598,7 @@ main() {
   ensure_directories
   ensure_config_templates
   ensure_dependencies
+  ensure_opsiconfd_ssl_assets
   bring_up_stack
 
   log_info "OpsiSuit installer finished"
