@@ -25,11 +25,11 @@ services:
           - db
 
   redis:
-    image: ${REDIS_IMAGE:-redis:7-alpine}
+    image: ${REDIS_IMAGE:-redis/redis-stack-server:latest}
     container_name: opsisuit-redis
     restart: unless-stopped
     command:
-      - redis-server
+      - redis-stack-server
       - --appendonly
       - "yes"
       - --port
@@ -66,6 +66,12 @@ services:
       OPSI_DB_NAME: ${DB_NAME:-opsi}
       OPSI_DB_USER: ${DB_USER:-opsi}
       OPSI_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      MYSQL_HOST: db
+      MYSQL_PORT: ${DB_PORT:-3306}
+      MYSQL_DATABASE: ${DB_NAME:-opsi}
+      MYSQL_USER: ${DB_USER:-opsi}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      REDIS_HOST: redis
       OPSICONFD_REDIS_URL: redis://redis:${REDIS_SERVICE_PORT:-6379}/0
       AGENT_SECRET: ${AGENT_SECRET:-ChangeMeAgentSecret!}
       AGENT_POLL_INTERVAL: ${AGENT_POLL_INTERVAL:-3600}

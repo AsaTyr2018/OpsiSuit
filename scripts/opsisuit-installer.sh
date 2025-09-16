@@ -128,7 +128,7 @@ get_env_default() {
     DB_USER) echo "opsi" ;;
     DB_PASSWORD) echo "" ;;
     DB_PORT) echo "3306" ;;
-    REDIS_IMAGE) echo "redis:7-alpine" ;;
+    REDIS_IMAGE) echo "redis/redis-stack-server:latest" ;;
     REDIS_PORT) echo "6379" ;;
     REDIS_SERVICE_PORT) echo "6379" ;;
     OPSI_ADMIN_USER) echo "opsiadmin" ;;

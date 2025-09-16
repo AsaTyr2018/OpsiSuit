@@ -17,7 +17,7 @@ vereinfachen soll.
 | Service       | Beschreibung                                                                 |
 |---------------|------------------------------------------------------------------------------|
 | `db`          | MariaDB 10.11 als zentrales Backend für OPSI.                                |
-| `redis`       | Redis 7 als In-Memory-Cache und Message-Broker für den OPSI-Server.          |
+| `redis`       | Redis Stack (inkl. RedisTimeSeries) als Cache und Metrik-Backend für OPSI.    |
 | `opsi-server` | OPSI-Server inklusive Config-API und Depot. Greift auf DB und Konfigurationen zu. |
 | `pxe`         | netboot.xyz TFTP/HTTP-Service mit Webinterface (Standard: `netbootxyz/netbootxyz`). |
 
@@ -111,6 +111,11 @@ Konfigurationsdateien überschreiben.
 > (`OPSICONFD_REDIS_URL`) ist ebenso fest auf
 > `redis://redis:${REDIS_SERVICE_PORT:-6379}/0` gesetzt und wird nicht mehr über
 > `.env` überschrieben.
+>
+> **Backend-URL Handling:** Die Angaben unter `DB_*` werden zusätzlich als `MYSQL_*`
+> in den OPSI-Server-Container durchgereicht. Dadurch nutzt der offizielle
+> `uibmz/opsi-server`-Entrypoint zuverlässig den MariaDB-Dienst `db` statt auf
+> `127.0.0.1` zurückzufallen.
 
 > **FQDN erforderlich:** Der OPSI-Server-Container übernimmt den in `.env`
 > definierten `OPSI_SERVER_FQDN` direkt als Hostnamen. Verwenden Sie deshalb immer
