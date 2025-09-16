@@ -77,8 +77,8 @@ services:
     container_name: opsisuit-pxe
     restart: unless-stopped
     environment:
-      PUID: ${SERVICE_UID:-0}
-      PGID: ${SERVICE_GID:-0}
+      PUID: ${SERVICE_UID:-1000}
+      PGID: ${SERVICE_GID:-1000}
       TZ: ${TIMEZONE:-UTC}
     ports:
       - "${PXE_TFTP_PORT:-69}:69/udp"
