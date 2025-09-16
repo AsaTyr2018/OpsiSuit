@@ -20,7 +20,9 @@ services:
     ports:
       - "${DB_PORT:-3306}:3306"
     networks:
-      - opsisuit
+      opsisuit:
+        aliases:
+          - db
 
   opsi-server:
     image: ${OPSI_SERVER_IMAGE:-uibmz/opsi-server:4.2}
