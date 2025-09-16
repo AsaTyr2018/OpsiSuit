@@ -396,6 +396,42 @@ prompt_yes_no() {
   done
 }
 
+prompt_reuse_existing_env() {
+  local answer=""
+  local prompt=""
+  local default_choice="reuse"
+
+  while true; do
+    if language_is_de; then
+      prompt="Reuse oder neu erstellen? [Reuse/neu]: "
+    else
+      prompt="Reuse or create new? [reuse/new]: "
+    fi
+
+    read -r -p "$prompt" answer
+    if [[ -z "$answer" ]]; then
+      answer="$default_choice"
+    fi
+
+    local normalized="${answer,,}"
+    case "$normalized" in
+      reuse|r|wiederverwenden|wieder|verwenden|w)
+        return 0
+        ;;
+      neu|new|n)
+        return 1
+        ;;
+      *)
+        if language_is_de; then
+          printf 'Bitte mit "Reuse" oder "neu" antworten.\n'
+        else
+          printf 'Please answer with "reuse" or "new".\n'
+        fi
+        ;;
+    esac
+  done
+}
+
 write_env_file() {
   if (( DRY_RUN )); then
     log_info "[dry-run] Would write configuration to ${ENV_FILE}"
@@ -434,11 +470,56 @@ write_env_file() {
 ensure_env_file() {
   load_existing_env_values
 
+  local env_example="${DOCKER_DIR}/.env.example"
+  local reuse_existing_env=0
+  local ignore_existing_defaults=0
+
+  if (( FORCE_ENV )); then
+    ignore_existing_defaults=1
+  fi
+
+  if (( ! FORCE_ENV )) && [[ -f "$ENV_FILE" ]]; then
+    local differs_from_example=1
+    if [[ -f "$env_example" ]] && cmp -s "$ENV_FILE" "$env_example"; then
+      differs_from_example=0
+    fi
+
+    if (( differs_from_example )); then
+      if language_is_de; then
+        log_info "Eine bestehende docker/.env wurde gefunden."
+      else
+        log_info "An existing docker/.env file was found."
+      fi
+
+      if prompt_reuse_existing_env; then
+        reuse_existing_env=1
+      else
+        ignore_existing_defaults=1
+        if language_is_de; then
+          log_info "docker/.env wird neu erstellt."
+        else
+          log_info "docker/.env will be recreated."
+        fi
+      fi
+    fi
+  fi
+
+  if (( reuse_existing_env )); then
+    if language_is_de; then
+      log_info "Bestehende docker/.env wird verwendet."
+    else
+      log_info "Reusing existing docker/.env."
+    fi
+    return
+  fi
+
   if language_is_de; then
     log_info "Interaktiver Installer gestartet."
     log_info "Drücken Sie Enter, um vorgeschlagene Standardwerte zu übernehmen."
     if (( FORCE_ENV )); then
       log_info "Vorhandene Werte werden aufgrund von --force-env ignoriert."
+    elif (( ignore_existing_defaults )); then
+      log_info "Vorhandene Werte werden verworfen und durch neue Eingaben ersetzt."
     elif [[ -f "$ENV_FILE" ]]; then
       log_info "Vorhandene Werte werden als Vorschläge angezeigt."
     fi
@@ -447,6 +528,8 @@ ensure_env_file() {
     log_info "Press Enter to accept the suggested defaults."
     if (( FORCE_ENV )); then
       log_info "Existing values are ignored because --force-env is set."
+    elif (( ignore_existing_defaults )); then
+      log_info "Existing values will be discarded and replaced with new input."
     elif [[ -f "$ENV_FILE" ]]; then
       log_info "Existing values are presented as suggestions."
     fi
@@ -456,7 +539,7 @@ ensure_env_file() {
 
   for var in "${ENV_VARIABLES[@]}"; do
     local default_value=""
-    if (( ! FORCE_ENV )) && [[ -v EXISTING_ENV_VALUES[$var] ]]; then
+    if (( ! ignore_existing_defaults )) && [[ -v EXISTING_ENV_VALUES[$var] ]]; then
       default_value="${EXISTING_ENV_VALUES[$var]}"
     else
       default_value="$(get_env_default "$var")"
