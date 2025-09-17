@@ -53,3 +53,12 @@ git --version
 ```
 
 If all commands print a version number, the prerequisites are satisfied.
+
+## Optional: Inventory Discovery Helper
+The automated inventory helper (`scripts/inventory-discovery.py`) relies on common network utilities provided by the base system:
+
+- `ping` (usually part of `iputils-ping` or `inetutils-ping`)
+- `ip` (`iproute2` package on most distributions)
+- `arp` (commonly provided by `net-tools`)
+
+Install these packages if your minimal distribution image does not ship them by default. The helper gracefully skips MAC discovery when the tools are unavailable.
