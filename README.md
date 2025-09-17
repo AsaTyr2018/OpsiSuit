@@ -32,6 +32,7 @@ OpsiSuit bundles everything required to bootstrap an OPSI environment. It ships 
 - **Editable templates:** Example configuration files for OPSI, PXE/TFTP, and the client agent are copied locally and version controlled via `.gitignore` so you can iterate safely.
 - **Secure-by-default defaults:** Critical ports, Redis connectivity, `opsiconfd` arguments, and a self-signed HTTPS certificate are pre-populated to avoid fragile setups.
 - **Extensible foundation:** Additional services (monitoring, web frontends, inventory extensions) can be layered on top of the provided structure.
+- **Automated inventory discovery:** A dedicated helper scans networks, registers new hosts via the ConfigAPI, and keeps report history for auditability.
 
 ## Roadmap & Progress
 | Status | Milestone |
@@ -94,7 +95,20 @@ sudo ./scripts/opsisuit-installer.sh --auto-install-deps
 
 # Perform a dry run with no side effects
 ./scripts/opsisuit-installer.sh --dry-run
+
+# Execute a discovery-only network inventory scan
+./scripts/inventory-discovery.py --dry-run --verbose
 ```
+
+### Automated Inventory Discovery
+`scripts/inventory-discovery.py` performs a concurrent ping sweep across the configured subnets, enriches reachable hosts with DNS/MAC metadata, and can directly register missing clients via the OPSI ConfigAPI. Reports are persisted to `data/inventory/` so you can track historic changes.
+
+Key behaviours:
+
+- **Configuration first:** Adjust `configs/inventory/auto-inventory.yml` (copied from the `.example` file by the installer) to define subnets, exclusions, worker limits, and API credentials. The file uses YAML in JSON-compatible syntax so it also works with minimal tooling.
+- **Safe dry runs:** Run with `--dry-run` (default in the example above) to validate connectivity without writing output or touching the server.
+- **OPSI integration:** When `registration.auto_register` is set to `true` the helper uses HTTPS JSON-RPC calls to create missing clients and queue an `auditHardware` action, ensuring newly discovered endpoints run a hardware inventory once the agent is active.
+- **Scheduling:** Add the script to `cron` or a `systemd` timer for recurring scans, e.g. nightly discovery of unregistered devices.
 The installer executes the following steps:
 1. Creates required directories (`data/`, `logs/`, `backups/`, `configs/`).
 2. Copies `.example` files to editable templates.
@@ -119,6 +133,7 @@ The rollback script stops all OpsiSuit containers, removes generated configurati
 2. **`configs/opsi/opsi.conf`** – Global OPSI settings. Copy additional snippets into `data/opsi/etc/conf.d/` once generated.
 3. **`configs/pxe/pxe.conf`** – Sample configuration for dnsmasq/TFTP.
 4. **`configs/agent/client-agent.conf`** – Template for the OPSI client agent (place into `data/opsi/etc/agent.d/`).
+5. **`configs/inventory/auto-inventory.yml`** – Defines subnets, exclusions, OPSI credentials, and behaviour for the automated discovery helper (`scripts/inventory-discovery.py`).
 
 ## Operational Notes
 > **Persistent data:** When the OPSI server container starts it relocates `/etc/opsi`, `/var/lib/opsi`, `/var/log/opsi`, and `/var/lib/opsiconfd` into `/data` (exposed as `data/opsi/` on the host). Logs live under `data/opsi/log/`.

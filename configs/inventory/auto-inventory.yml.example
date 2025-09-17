@@ -1,0 +1,40 @@
+{
+  "enabled": true,
+  "subnets": [
+    "192.168.1.0/24"
+  ],
+  "exclude_addresses": [
+    "192.168.1.1"
+  ],
+  "ping": {
+    "binary": "ping",
+    "count": 1,
+    "timeout_ms": 750,
+    "workers": 64
+  },
+  "discovery": {
+    "dns_lookup": true,
+    "capture_mac": true
+  },
+  "opsi": {
+    "api_url": "https://opsi.local:4447/rpc",
+    "username": "opsiadmin",
+    "password": "ChangeMeAdmin!",
+    "verify_ssl": true,
+    "ca_bundle": null,
+    "request_timeout": 10
+  },
+  "registration": {
+    "auto_register": false,
+    "client_id_template": "{hostname}.{domain}",
+    "fallback_domain": "opsi.local",
+    "default_group": "inventory-auto",
+    "notes": "Discovered via automated inventory scan",
+    "inventory_number": "",
+    "trigger_hwscan": true
+  },
+  "output": {
+    "directory": "data/inventory",
+    "max_history": 30
+  }
+}

@@ -19,6 +19,11 @@
 | Compliance | Patch level, antivirus state, encryption status | Custom scripts, OS queries |
 | Network | MAC/IP, VLAN, Wi-Fi SSID | Agent network probes |
 
+## Automated Discovery Workflow
+- Use `scripts/inventory-discovery.py` for recurring network sweeps. The helper reads `configs/inventory/auto-inventory.yml` to determine subnets, exclusions, and OPSI credentials. Reports are written to `data/inventory/` so you can diff results between runs.
+- Enable `registration.auto_register` in the configuration to create missing OPSI clients automatically and queue an `auditHardware` action. Combine with a nightly `systemd` timer or cron job.
+- Run the helper initially with `--dry-run` to validate reachability and tune worker counts before activating automatic registration.
+
 ## Compliance Policies
 1. **Baseline Definitions:** Document security standards (e.g., BitLocker required, specific antivirus versions).
 2. **Policy Enforcement:** Use OPSI product actions to remediate non-compliance (install patch, enable service).

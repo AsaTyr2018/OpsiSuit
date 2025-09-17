@@ -1012,6 +1012,7 @@ ensure_directories() {
     "$DATA_DIR/opsi/lib"
     "$DATA_DIR/opsi/log"
     "$DATA_DIR/opsi/opsiconfd"
+    "$DATA_DIR/inventory"
     "$DATA_DIR/pxe"
     "$DATA_DIR/redis"
     "$LOG_DIR"
@@ -1021,6 +1022,7 @@ ensure_directories() {
     "$CONFIG_DIR/opsi"
     "$CONFIG_DIR/pxe"
     "$CONFIG_DIR/agent"
+    "$CONFIG_DIR/inventory"
   )
 
   for dir in "${dirs[@]}"; do
@@ -1232,6 +1234,7 @@ ensure_config_templates() {
   copy_template "$CONFIG_DIR/opsi/opsi.conf.example" "$CONFIG_DIR/opsi/opsi.conf" "$FORCE_CONFIG"
   copy_template "$CONFIG_DIR/pxe/pxe.conf.example" "$CONFIG_DIR/pxe/pxe.conf" "$FORCE_CONFIG"
   copy_template "$CONFIG_DIR/agent/client-agent.conf.example" "$CONFIG_DIR/agent/client-agent.conf" "$FORCE_CONFIG"
+  copy_template "$CONFIG_DIR/inventory/auto-inventory.yml.example" "$CONFIG_DIR/inventory/auto-inventory.yml" "$FORCE_CONFIG"
   render_opsiconfd_conf
 }
 
